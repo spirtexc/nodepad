@@ -9,8 +9,9 @@ interface HeadingNode {
   children: HeadingNode[]
 }
 
-function parseHeadings(content: string, filename: string): HeadingNode {
-  const root: HeadingNode = { text: filename.replace(/\.md$/i, ''), level: 0, children: [] }
+function parseHeadings(content: string): HeadingNode {
+  // Hidden root — never rendered, just holds the tree together
+  const root: HeadingNode = { text: '', level: 0, children: [] }
   const stack: HeadingNode[] = [root]
 
   for (const line of content.split('\n')) {
@@ -53,7 +54,8 @@ function renderTree(container: HTMLElement, rootData: HeadingNode): void {
   const hierarchy = d3.hierarchy(rootData, d => d.children)
   d3.tree<HeadingNode>().nodeSize([34, 230])(hierarchy)
 
-  const nodes = hierarchy.descendants() as d3.HierarchyPointNode<HeadingNode>[]
+  // Skip the hidden root (depth 0) — render only real heading nodes
+  const nodes = hierarchy.descendants().filter(d => d.depth > 0) as d3.HierarchyPointNode<HeadingNode>[]
   const ys = nodes.map(d => d.x)
   const offsetX = 80
   const offsetY = H / 2 - (Math.min(...ys) + Math.max(...ys)) / 2
@@ -64,7 +66,7 @@ function renderTree(container: HTMLElement, rootData: HeadingNode): void {
     .attr('stroke', 'var(--border)')
     .attr('stroke-width', 1.5)
     .selectAll('path')
-    .data(hierarchy.links())
+    .data(hierarchy.links().filter(l => l.source.depth > 0))
     .join('path')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .attr('d', (d3.linkHorizontal() as any)
@@ -156,7 +158,7 @@ const STYLES = `
 `
 
 function buildMindmapModal(content: string, filename: string, close: () => void): HTMLElement {
-  const root = parseHeadings(content, filename)
+  const root = parseHeadings(content)
 
   const wrap = document.createElement('div')
   wrap.className = 'mindmap-modal'

@@ -158,6 +158,43 @@ export class Vault {
     } catch { return null }
   }
 
+  async moveFile(fromPath: string, toFolderPath: string): Promise<boolean> {
+    if (!this.dirHandle) return false
+    try {
+      const name = fromPath.split('/').pop()!
+      const fromParentPath = fromPath.split('/').slice(0, -1).join('/')
+      const fromDir = fromParentPath ? await this.resolveDir(fromParentPath) : this.dirHandle
+      if (!fromDir) return false
+      const toDir = toFolderPath ? await this.resolveDir(toFolderPath) : this.dirHandle
+      if (!toDir) return false
+      const srcHandle = await fromDir.getFileHandle(name)
+      const buf = await (await srcHandle.getFile()).arrayBuffer()
+      const dstHandle = await toDir.getFileHandle(name, { create: true })
+      const w = await dstHandle.createWritable()
+      await w.write(buf)
+      await w.close()
+      await fromDir.removeEntry(name)
+      return true
+    } catch { return false }
+  }
+
+  async moveFolder(fromPath: string, toFolderPath: string): Promise<boolean> {
+    if (!this.dirHandle) return false
+    try {
+      const name = fromPath.split('/').pop()!
+      const fromParentPath = fromPath.split('/').slice(0, -1).join('/')
+      const fromParent = fromParentPath ? await this.resolveDir(fromParentPath) : this.dirHandle
+      if (!fromParent) return false
+      const toDir = toFolderPath ? await this.resolveDir(toFolderPath) : this.dirHandle
+      if (!toDir) return false
+      const srcDir = await fromParent.getDirectoryHandle(name)
+      const dstDir = await toDir.getDirectoryHandle(name, { create: true })
+      await this.copyDir(srcDir, dstDir)
+      await fromParent.removeEntry(name, { recursive: true })
+      return true
+    } catch { return false }
+  }
+
   async renameFile(filePath: string, oldName: string, newName: string): Promise<boolean> {
     if (!this.dirHandle) return false
     try {

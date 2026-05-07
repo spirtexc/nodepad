@@ -44,15 +44,15 @@ Right-click any diagram to open a context menu with:
 
 When your cursor is **inside** a mermaid block, the raw code becomes editable and a **Live Preview** panel appears directly below the code block.
 
-- The preview updates automatically as you type (debounced 300 ms)
-- Click the **yellow × button** in the preview header to exit edit mode
-- Moving the cursor **outside** the block also exits edit mode automatically
+- The preview updates as you type (debounced 300 ms)
+- Click the **× button** in the preview header to exit edit mode
+- Moving the cursor **outside** the block also exits edit mode
 
 ---
 
 ## Diagram types
 
-Any diagram type supported by Mermaid works. Examples:
+Any diagram type supported by Mermaid works. Common examples:
 
 ### Flowchart
 
@@ -98,6 +98,18 @@ erDiagram
 ```
 ````
 
+### Class diagram
+
+````
+```mermaid
+classDiagram
+  Animal <|-- Dog
+  Animal <|-- Cat
+  Animal : +name string
+  Animal : +speak()
+```
+````
+
 ---
 
 ## Theme
@@ -111,4 +123,4 @@ The diagram theme follows the app theme automatically:
 
 ## Permissions
 
-This plugin requires no special permissions — it operates entirely within the editor.
+This plugin requires no special permissions — it operates entirely within the editor view layer.

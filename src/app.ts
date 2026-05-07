@@ -21,6 +21,7 @@ import { PluginLoader } from './plugin-api/loader.ts'
 import mermaidPlugin from '../plugins/mermaid-diagrams/index.ts'
 import timelinePlugin from '../plugins/offline-timeline/index.ts'
 import mindmapPlugin from '../plugins/mindmap/index.ts'
+import graphViewPlugin from '../plugins/graph-view/index.ts'
 
 export class App {
   private editor!: Editor
@@ -40,7 +41,7 @@ export class App {
   private tagsIndex: TagsIndex
   private pluginLoader: PluginLoader
   private diskPlugins: Map<string, { plugin: Plugin; blobUrl: string; filename: string; enabled: boolean }> = new Map()
-  private builtinPlugins: Plugin[] = [mermaidPlugin, timelinePlugin, mindmapPlugin]
+  private builtinPlugins: Plugin[] = [mermaidPlugin, timelinePlugin, mindmapPlugin, graphViewPlugin]
   private pluginCleanups: Map<string, Array<() => void>> = new Map()
   private commands: Map<string, Command> = new Map()
   private views: Map<string, (container: HTMLElement) => View> = new Map()
@@ -80,6 +81,8 @@ export class App {
       onNewFileInFolder: (folderPath) => this.handleNewFileInFolder(folderPath),
       onNewFolderInFolder: (folderPath) => this.handleNewFolderInFolder(folderPath),
       onCompareFiles: (a, b) => this.handleCompareFiles(a, b),
+      onMoveFile: (fromPath, toFolderPath) => this.handleMoveFile(fromPath, toFolderPath),
+      onMoveFolder: (fromPath, toFolderPath) => this.handleMoveFolder(fromPath, toFolderPath),
     })
 
     const workspace = layout.right
@@ -118,6 +121,7 @@ export class App {
     )
 
     this.initKeyboardShortcuts()
+    this.initWikilinkNavigation()
 
     this.pluginLoader = new PluginLoader()
     window.addEventListener('online', () => this.onlineEmitter.emit())
@@ -144,6 +148,34 @@ export class App {
         }
       }
     })
+  }
+
+  private initWikilinkNavigation(): void {
+    document.addEventListener('cm-wikilink-open', (e) => {
+      const { path } = (e as CustomEvent<{ path: string }>).detail
+      void this.resolveAndOpenWikilink(path)
+    })
+  }
+
+  private async resolveAndOpenWikilink(rawPath: string): Promise<void> {
+    // Try progressively looser matches: exact → with .md → bare name
+    const candidates = [
+      rawPath,
+      rawPath + '.md',
+      rawPath.replace(/\.md$/i, '') + '.md',
+    ]
+    for (const c of candidates) {
+      if (this.fileHandles.has(c)) { await this.openFileByPath(c); return }
+    }
+    // Fall back to matching bare filename across all handles
+    const bare = rawPath.split('/').pop()?.toLowerCase().replace(/\.md$/i, '')
+    if (!bare) return
+    for (const p of this.fileHandles.keys()) {
+      if (p.split('/').pop()?.toLowerCase().replace(/\.md$/i, '') === bare) {
+        await this.openFileByPath(p)
+        return
+      }
+    }
   }
 
   private async openFileByPath(path: string): Promise<void> {
@@ -323,11 +355,19 @@ export class App {
   }
 
   private async handleNewFileInFolder(folderPath: string): Promise<void> {
+    if (!this.vault.getVaultRoot()) {
+      alert('Please open a folder first to create files inside it.')
+      return
+    }
     const name = prompt('Enter new file name:')
     if (!name) return
     const finalName = name.toLowerCase().endsWith('.md') || name.toLowerCase().endsWith('.txt') ? name : `${name}.md`
     const handle = await this.vault.createFileInFolder(folderPath, finalName)
-    if (handle) await this.reloadVaultFolder()
+    if (handle) {
+      await this.reloadVaultFolder()
+      const filePath = folderPath ? `${folderPath}/${finalName}` : finalName
+      this.openVaultFile({ name: finalName, path: filePath, handle })
+    }
   }
 
   private async handleNewFolderInFolder(folderPath: string): Promise<void> {
@@ -335,6 +375,21 @@ export class App {
     if (!name) return
     const handle = await this.vault.createFolderInFolder(folderPath, name)
     if (handle) await this.reloadVaultFolder()
+  }
+
+  private async handleMoveFile(fromPath: string, toFolderPath: string): Promise<void> {
+    const ok = await this.vault.moveFile(fromPath, toFolderPath)
+    if (!ok) { alert('Move failed.'); return }
+    const name = fromPath.split('/').pop() ?? fromPath
+    const newPath = toFolderPath ? `${toFolderPath}/${name}` : name
+    this.fileRenameEmitter.emit({ oldPath: fromPath, newPath })
+    await this.reloadVaultFolder()
+  }
+
+  private async handleMoveFolder(fromPath: string, toFolderPath: string): Promise<void> {
+    const ok = await this.vault.moveFolder(fromPath, toFolderPath)
+    if (!ok) { alert('Move failed.'); return }
+    await this.reloadVaultFolder()
   }
 
   private handleCompareFiles(
@@ -612,6 +667,7 @@ export class App {
         closeBtn.addEventListener('click', closeOverlay)
         modal.querySelector('.diff-header')?.appendChild(closeBtn)
       },
+      openFile: (path: string) => this.openFileByPath(path),
       onFileOpen: (cb: (f: VaultFile) => void) => this.fileOpenEmitter.on(cb),
       onFileChange: (cb: (f: VaultFile) => void) => this.fileChangeEmitter.on(cb),
       onFileSave: (cb: (f: VaultFile) => void) => this.fileSaveEmitter.on(cb),

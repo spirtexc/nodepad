@@ -6,6 +6,7 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { Compartment } from '@codemirror/state'
 import type { Extension } from '@codemirror/state'
 import { markdownWYSIWYG } from './markdown.ts'
+import { wikilinkDecorations, wikilinkTheme } from './wikilinks.ts'
 
 export const themeCompartment = new Compartment()
 
@@ -42,6 +43,8 @@ export function buildExtensions(onChange: (content: string) => void): Extension[
     EditorView.lineWrapping,
     themeCompartment.of(getThemeExtension(isDark)),
     markdownWYSIWYG,
+    wikilinkDecorations,
+    wikilinkTheme,
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         onChange(update.state.doc.toString())

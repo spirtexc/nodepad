@@ -11,6 +11,27 @@ interface SidebarCallbacks {
   onNewFileInFolder: (folderPath: string) => Promise<void>
   onNewFolderInFolder: (folderPath: string) => Promise<void>
   onCompareFiles: (a: VaultFile, b: VaultFile) => void
+  onMoveFile: (fromPath: string, toFolderPath: string) => Promise<void>
+  onMoveFolder: (fromPath: string, toFolderPath: string) => Promise<void>
+}
+
+// ── Drag helpers ──────────────────────────────────────────────────────────────
+
+interface DragPayload { type: 'file' | 'folder'; path: string; name: string }
+
+// dataTransfer.getData() returns '' during dragover (browser security restriction).
+// Store the payload here on dragstart so dragover handlers can read it.
+let activeDrag: DragPayload | null = null
+
+function getDragData(e: DragEvent): DragPayload | null {
+  // During 'drop' we can read from dataTransfer; during 'dragover' use activeDrag.
+  if (activeDrag) return activeDrag
+  try {
+    const raw = e.dataTransfer?.getData('text/plain')
+    if (!raw) return null
+    const d = JSON.parse(raw) as DragPayload
+    return d.type === 'file' || d.type === 'folder' ? d : null
+  } catch { return null }
 }
 
 // ── Context menu ──────────────────────────────────────────────────────────────
@@ -119,6 +140,33 @@ export class Sidebar {
     this.list.appendChild(this.emptyMsg)
     this.root.appendChild(this.list)
 
+    // Root drop zone — drop onto the list background moves to vault root
+    this.list.addEventListener('dragover', (e) => {
+      const data = getDragData(e)
+      if (!data) return
+      const currentParent = data.path.split('/').slice(0, -1).join('/')
+      if (currentParent === '') return  // already at root
+      if (!(e.target as HTMLElement).closest('.sidebar-folder-item')) {
+        e.preventDefault()
+        e.dataTransfer!.dropEffect = 'move'
+        this.list.classList.add('drag-over-root')
+      }
+    })
+    this.list.addEventListener('dragleave', (e) => {
+      if (!this.list.contains(e.relatedTarget as Node)) this.list.classList.remove('drag-over-root')
+    })
+    this.list.addEventListener('drop', (e) => {
+      this.list.classList.remove('drag-over-root')
+      if ((e.target as HTMLElement).closest('.sidebar-folder-item')) return
+      const data = getDragData(e)
+      if (!data) return
+      const currentParent = data.path.split('/').slice(0, -1).join('/')
+      if (currentParent === '') return
+      e.preventDefault()
+      if (data.type === 'file') void this.callbacks.onMoveFile(data.path, '')
+      else void this.callbacks.onMoveFolder(data.path, '')
+    })
+
     this.panelsEl = document.createElement('div')
     this.panelsEl.className = 'sidebar-panels'
     this.root.appendChild(this.panelsEl)
@@ -184,7 +232,15 @@ export class Sidebar {
     newFileBtn.className = 'sidebar-toolbar-btn'
     newFileBtn.title = 'New file'
     newFileBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>`
-    newFileBtn.addEventListener('click', callbacks.onNewFile)
+    newFileBtn.addEventListener('click', () => {
+      if (this.activeFilePath) {
+        const parts = this.activeFilePath.split('/')
+        const folderPath = parts.length > 1 ? parts.slice(0, -1).join('/') : ''
+        void callbacks.onNewFileInFolder(folderPath)
+      } else {
+        callbacks.onNewFile()
+      }
+    })
 
     const openFolderBtn = document.createElement('button')
     openFolderBtn.className = 'sidebar-toolbar-btn'
@@ -196,7 +252,15 @@ export class Sidebar {
     newFolderBtn.className = 'sidebar-toolbar-btn'
     newFolderBtn.title = 'New folder'
     newFolderBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>`
-    newFolderBtn.addEventListener('click', callbacks.onNewFolder)
+    newFolderBtn.addEventListener('click', () => {
+      if (this.activeFilePath) {
+        const parts = this.activeFilePath.split('/')
+        const folderPath = parts.length > 1 ? parts.slice(0, -1).join('/') : ''
+        void callbacks.onNewFolderInFolder(folderPath)
+      } else {
+        callbacks.onNewFolder()
+      }
+    })
 
     bar.appendChild(title)
     bar.appendChild(newFileBtn)
@@ -280,6 +344,7 @@ export class Sidebar {
     const folderEl = document.createElement('div')
     folderEl.className = 'sidebar-folder-item'
     folderEl.style.paddingLeft = `${8 + depth * 16}px`
+    folderEl.draggable = true
 
     const chevron = document.createElement('span')
     chevron.className = 'sidebar-folder-icon'
@@ -336,6 +401,46 @@ export class Sidebar {
       ])
     })
 
+    // ── Drag source ──────────────────────────────────────────────────────────
+    folderEl.addEventListener('dragstart', (e) => {
+      e.stopPropagation()
+      activeDrag = { type: 'folder', path: folder.path, name: folder.name }
+      e.dataTransfer!.effectAllowed = 'move'
+      e.dataTransfer!.setData('text/plain', JSON.stringify(activeDrag))
+      folderEl.classList.add('dragging')
+    })
+    folderEl.addEventListener('dragend', () => {
+      activeDrag = null
+      folderEl.classList.remove('dragging')
+    })
+
+    // ── Drop target (drop into this folder) ──────────────────────────────────
+    folderEl.addEventListener('dragover', (e) => {
+      const data = getDragData(e)
+      if (!data) return
+      // Can't drop onto itself or a descendant
+      if (data.type === 'folder' && (data.path === folder.path || folder.path.startsWith(data.path + '/'))) return
+      // No-op if already inside this folder
+      const currentParent = data.path.split('/').slice(0, -1).join('/')
+      if (currentParent === folder.path) return
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer!.dropEffect = 'move'
+      folderEl.classList.add('drag-over')
+    })
+    folderEl.addEventListener('dragleave', (e) => {
+      if (!folderEl.contains(e.relatedTarget as Node)) folderEl.classList.remove('drag-over')
+    })
+    folderEl.addEventListener('drop', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      folderEl.classList.remove('drag-over')
+      const data = getDragData(e)
+      if (!data) return
+      if (data.type === 'file') void this.callbacks.onMoveFile(data.path, folder.path)
+      else if (data.type === 'folder' && data.path !== folder.path) void this.callbacks.onMoveFolder(data.path, folder.path)
+    })
+
     return { folderEl, children, chevron }
   }
 
@@ -344,6 +449,7 @@ export class Sidebar {
     item.className = 'sidebar-item'
     item.style.paddingLeft = `${8 + depth * 16}px`
     item.dataset['path'] = file.path
+    item.draggable = true
 
     const icon = document.createElement('span')
     icon.className = 'sidebar-item-icon'
@@ -357,6 +463,18 @@ export class Sidebar {
     item.appendChild(icon)
     item.appendChild(label)
     item.addEventListener('click', () => this.treeClickHandler?.(file))
+
+    item.addEventListener('dragstart', (e) => {
+      e.stopPropagation()
+      activeDrag = { type: 'file', path: file.path, name: file.name }
+      e.dataTransfer!.effectAllowed = 'move'
+      e.dataTransfer!.setData('text/plain', JSON.stringify(activeDrag))
+      item.classList.add('dragging')
+    })
+    item.addEventListener('dragend', () => {
+      activeDrag = null
+      item.classList.remove('dragging')
+    })
 
     item.addEventListener('contextmenu', (e) => {
       e.preventDefault()

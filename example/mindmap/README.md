@@ -1,6 +1,6 @@
 # Mindmap Plugin
 
-Visualises the heading structure of the active Markdown file as an interactive horizontal tree diagram. Powered by [D3.js](https://d3js.org/).
+Visualises the heading structure of the active Markdown file as an interactive horizontal tree diagram. Powered by D3.js.
 
 ---
 
@@ -8,8 +8,7 @@ Visualises the heading structure of the active Markdown file as an interactive h
 
 The plugin reads all `#` through `######` headings from the currently open file and builds a hierarchy from them. It renders that hierarchy as a horizontal tree where:
 
-- The **root node** is the filename
-- **Level 1 headings** (`#`) are direct children of the root
+- **Level 1 headings** (`#`) are the top-level nodes
 - **Level 2–6 headings** nest under their parent heading
 - Nodes are **colour-coded** by heading level
 
@@ -34,15 +33,12 @@ If the active file has no headings:
 | Click + drag on background | Pan the view |
 | × button in header | Close the modal |
 
-The mindmap starts centred and auto-fits to the content. Scroll to zoom out if the tree is large.
-
 ---
 
 ## Node colours by heading level
 
 | Colour | Level |
 |--------|-------|
-| Blue | Root (filename) |
 | Purple | `#` H1 |
 | Red | `##` H2 |
 | Orange | `###` H3 |
@@ -52,36 +48,11 @@ The mindmap starts centred and auto-fits to the content. Scroll to zoom out if t
 
 ---
 
-## Example
+## Example files
 
-Given a file with this structure:
-
-```markdown
-# Introduction
-## Background
-## Goals
-
-# Implementation
-## Architecture
-### Frontend
-### Backend
-## Testing
-
-# Conclusion
-```
-
-The mindmap renders as a horizontal tree:
-
-```
-filename ── Introduction ── Background
-         │              └── Goals
-         ├── Implementation ── Architecture ── Frontend
-         │                 │               └── Backend
-         │                 └── Testing
-         └── Conclusion
-```
-
-Displayed left-to-right with curved links connecting parent and child nodes.
+- [[mindmap/example-simple|Simple mindmap]] — basic heading structure
+- [[mindmap/example-deep|Deep mindmap]] — 6 levels of nesting
+- [[mindmap/example-project|Project mindmap]] — real-world project structure
 
 ---
 

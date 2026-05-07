@@ -42,6 +42,7 @@ export interface App {
   writeFile(path: string, content: string): Promise<void>
   listFiles(folder?: string): VaultFile[]
   getBacklinks(path: string): VaultFile[]
+  openFile(path: string): Promise<void>
   onFileOpen(cb: (file: VaultFile) => void): Unsubscribe
   onFileChange(cb: (file: VaultFile) => void): Unsubscribe
   onFileSave(cb: (file: VaultFile) => void): Unsubscribe
