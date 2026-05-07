@@ -1,0 +1,32 @@
+.statusbar {
+  height: 32px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background: var(--accent);
+  padding: 0 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, .9);
+  gap: 0;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.statusbar-item {
+  white-space: nowrap;
+  padding: 0 8px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid rgba(255,255,255,.15);
+  cursor: default;
+}
+
+.statusbar-item:first-child { padding-left: 0; }
+
+.statusbar-filename {
+  font-weight: 500;
+  color: #fff;
+}
+
+.statusbar-spacer { flex: 1; }
