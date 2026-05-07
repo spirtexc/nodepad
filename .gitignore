@@ -134,3 +134,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+fix-prompt.md
+CLAUDE.md
+image.png
+test1/New folder (2)/file1.md
+test1/New folder/New Text Document (2).TXT
+test1/New folder/New Text Document.TXT

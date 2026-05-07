@@ -19,6 +19,7 @@ import type { App as AppAPI, Plugin, Command, View } from './plugin-api/index.ts
 import { PluginLoader } from './plugin-api/loader.ts'
 import mermaidPlugin from '../plugins/mermaid-diagrams/index.ts'
 import timelinePlugin from '../plugins/offline-timeline/index.ts'
+import mindmapPlugin from '../plugins/mindmap/index.ts'
 
 export class App {
   private editor!: Editor
@@ -38,7 +39,7 @@ export class App {
   private tagsIndex: TagsIndex
   private pluginLoader: PluginLoader
   private diskPlugins: Map<string, { plugin: Plugin; blobUrl: string; filename: string; enabled: boolean }> = new Map()
-  private builtinPlugins: Plugin[] = [mermaidPlugin, timelinePlugin]
+  private builtinPlugins: Plugin[] = [mermaidPlugin, timelinePlugin, mindmapPlugin]
   private pluginCleanups: Map<string, Array<() => void>> = new Map()
   private commands: Map<string, Command> = new Map()
   private views: Map<string, (container: HTMLElement) => View> = new Map()
