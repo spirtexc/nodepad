@@ -16,6 +16,7 @@ import { debounce } from './utils/debounce.ts'
 import { makeEmitter, makeVoidEmitter } from './utils/emitter.ts'
 import { get, set } from 'idb-keyval'
 import type { App as AppAPI, Plugin, Command, View } from './plugin-api/index.ts'
+import { buildDiffModal } from './layout/diff-view.ts'
 import { PluginLoader } from './plugin-api/loader.ts'
 import mermaidPlugin from '../plugins/mermaid-diagrams/index.ts'
 import timelinePlugin from '../plugins/offline-timeline/index.ts'
@@ -51,6 +52,7 @@ export class App {
   private previewUpdateEmitter = makeEmitter<HTMLElement>()
   private onlineEmitter = makeVoidEmitter()
   private offlineEmitter = makeVoidEmitter()
+  private fileRenameEmitter = makeEmitter<{ oldPath: string; newPath: string }>()
 
   constructor(rootElement: HTMLElement) {
     this.vault = new Vault()
@@ -71,6 +73,13 @@ export class App {
       onOpenFolder: () => this.handleOpenFolder(),
       onNewFile: () => this.handleNewFile(),
       onNewFolder: () => this.handleNewFolder(),
+      onRenameFile: (file, newName) => this.handleRenameFile(file, newName),
+      onRenameFolder: (folder, newName) => this.handleRenameFolder(folder, newName),
+      onDeleteFile: (file) => this.handleDeleteFile(file),
+      onDeleteFolder: (folder) => this.handleDeleteFolder(folder),
+      onNewFileInFolder: (folderPath) => this.handleNewFileInFolder(folderPath),
+      onNewFolderInFolder: (folderPath) => this.handleNewFolderInFolder(folderPath),
+      onCompareFiles: (a, b) => this.handleCompareFiles(a, b),
     })
 
     const workspace = layout.right
@@ -285,6 +294,70 @@ export class App {
       await this.reloadVaultFolder()
       this.openVaultFile({ name: finalName, path: finalName, handle })
     }
+  }
+
+  private async handleRenameFile(file: import('./vault/file-tree.ts').VaultFile, newName: string): Promise<void> {
+    const ok = await this.vault.renameFile(file.path, file.name, newName)
+    if (!ok) { alert('Rename failed.'); return }
+    const newPath = file.path.split('/').slice(0, -1).concat(newName).join('/') || newName
+    this.fileRenameEmitter.emit({ oldPath: file.path, newPath })
+    await this.reloadVaultFolder()
+  }
+
+  private async handleRenameFolder(folder: import('./vault/file-tree.ts').VaultFolder, newName: string): Promise<void> {
+    const ok = await this.vault.renameFolder(folder.path, folder.name, newName)
+    if (!ok) { alert('Rename failed.'); return }
+    await this.reloadVaultFolder()
+  }
+
+  private async handleDeleteFile(file: import('./vault/file-tree.ts').VaultFile): Promise<void> {
+    const ok = await this.vault.deleteFile(file.path, file.name)
+    if (!ok) { alert('Delete failed.'); return }
+    await this.reloadVaultFolder()
+  }
+
+  private async handleDeleteFolder(folder: import('./vault/file-tree.ts').VaultFolder): Promise<void> {
+    const ok = await this.vault.deleteFolder(folder.path, folder.name)
+    if (!ok) { alert('Delete failed.'); return }
+    await this.reloadVaultFolder()
+  }
+
+  private async handleNewFileInFolder(folderPath: string): Promise<void> {
+    const name = prompt('Enter new file name:')
+    if (!name) return
+    const finalName = name.toLowerCase().endsWith('.md') || name.toLowerCase().endsWith('.txt') ? name : `${name}.md`
+    const handle = await this.vault.createFileInFolder(folderPath, finalName)
+    if (handle) await this.reloadVaultFolder()
+  }
+
+  private async handleNewFolderInFolder(folderPath: string): Promise<void> {
+    const name = prompt('Enter new folder name:')
+    if (!name) return
+    const handle = await this.vault.createFolderInFolder(folderPath, name)
+    if (handle) await this.reloadVaultFolder()
+  }
+
+  private handleCompareFiles(
+    a: import('./vault/file-tree.ts').VaultFile,
+    b: import('./vault/file-tree.ts').VaultFile,
+  ): void {
+    void Promise.all([
+      this.vault.readFileByHandle(a.handle),
+      this.vault.readFileByHandle(b.handle),
+    ]).then(([contentA, contentB]) => {
+      const core = this.buildCoreServices()
+      core.openDiff(a.name, contentA, b.name, contentB)
+    })
+  }
+
+  private buildModalOverlay(content: HTMLElement): () => void {
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    const close = () => overlay.remove()
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close() })
+    overlay.appendChild(content)
+    document.body.appendChild(overlay)
+    return close
   }
 
   private async handleNewFolder(): Promise<void> {
@@ -522,17 +595,28 @@ export class App {
         return el
       },
       openModal: (content: HTMLElement) => {
-        const overlay = document.createElement('div')
-        overlay.className = 'modal-overlay'
-        const close = () => overlay.remove()
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close() })
-        overlay.appendChild(content)
-        document.body.appendChild(overlay)
-        return close
+        return this.buildModalOverlay(content)
+      },
+      addSidebarPanel: (id: string, title: string, factory: (container: HTMLElement) => void) => {
+        const remove = this.sidebar.addPanel(id, title, factory)
+        track(remove)
+        return remove
+      },
+      openDiff: (nameA: string, contentA: string, nameB: string, contentB: string, onRestoreA?: () => void) => {
+        const modal = buildDiffModal(nameA, contentA, nameB, contentB, onRestoreA)
+        const closeOverlay = this.buildModalOverlay(modal)
+        const closeBtn = document.createElement('button')
+        closeBtn.className = 'diff-close-btn'
+        closeBtn.title = 'Close'
+        closeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+        closeBtn.addEventListener('click', closeOverlay)
+        modal.querySelector('.diff-header')?.appendChild(closeBtn)
       },
       onFileOpen: (cb: (f: VaultFile) => void) => this.fileOpenEmitter.on(cb),
       onFileChange: (cb: (f: VaultFile) => void) => this.fileChangeEmitter.on(cb),
       onFileSave: (cb: (f: VaultFile) => void) => this.fileSaveEmitter.on(cb),
+      onFileRename: (cb: (oldPath: string, newPath: string) => void) =>
+        this.fileRenameEmitter.on(({ oldPath, newPath }) => cb(oldPath, newPath)),
       onPreviewUpdate: (cb: (container: HTMLElement) => void) => this.previewUpdateEmitter.on(cb),
       onOnline: (cb: () => void) => this.onlineEmitter.on(cb),
       onOffline: (cb: () => void) => this.offlineEmitter.on(cb),

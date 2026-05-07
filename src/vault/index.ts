@@ -1,6 +1,7 @@
 import { get, set } from 'idb-keyval'
 
 export type { VaultFile } from './file-tree.ts'
+export type { VaultFolder } from './file-tree.ts'
 
 export class Vault {
   private dirHandle: FileSystemDirectoryHandle | null = null
@@ -90,6 +91,102 @@ export class Vault {
     } catch {
       return []
     }
+  }
+
+  private async resolveDir(path: string): Promise<FileSystemDirectoryHandle | null> {
+    if (!this.dirHandle) return null
+    const parts = path.split('/').filter(Boolean)
+    let dir: FileSystemDirectoryHandle = this.dirHandle
+    for (const part of parts) {
+      try { dir = await dir.getDirectoryHandle(part) }
+      catch { return null }
+    }
+    return dir
+  }
+
+  private async copyDir(src: FileSystemDirectoryHandle, dst: FileSystemDirectoryHandle): Promise<void> {
+    for await (const [name, entry] of src.entries()) {
+      if (entry.kind === 'file') {
+        const buf = await (await entry.getFile()).arrayBuffer()
+        const dstFile = await dst.getFileHandle(name, { create: true })
+        const w = await dstFile.createWritable()
+        await w.write(buf)
+        await w.close()
+      } else {
+        await this.copyDir(entry, await dst.getDirectoryHandle(name, { create: true }))
+      }
+    }
+  }
+
+  async deleteFile(filePath: string, name: string): Promise<boolean> {
+    if (!this.dirHandle) return false
+    try {
+      const parentPath = filePath.split('/').slice(0, -1).join('/')
+      const parentDir = parentPath ? await this.resolveDir(parentPath) : this.dirHandle
+      if (!parentDir) return false
+      await parentDir.removeEntry(name)
+      return true
+    } catch { return false }
+  }
+
+  async deleteFolder(folderPath: string, name: string): Promise<boolean> {
+    if (!this.dirHandle) return false
+    try {
+      const parentPath = folderPath.split('/').slice(0, -1).join('/')
+      const parentDir = parentPath ? await this.resolveDir(parentPath) : this.dirHandle
+      if (!parentDir) return false
+      await parentDir.removeEntry(name, { recursive: true })
+      return true
+    } catch { return false }
+  }
+
+  async createFileInFolder(folderPath: string, name: string): Promise<FileSystemFileHandle | null> {
+    if (!this.dirHandle) return null
+    try {
+      const dir = folderPath ? await this.resolveDir(folderPath) : this.dirHandle
+      if (!dir) return null
+      return await dir.getFileHandle(name, { create: true })
+    } catch { return null }
+  }
+
+  async createFolderInFolder(folderPath: string, name: string): Promise<FileSystemDirectoryHandle | null> {
+    if (!this.dirHandle) return null
+    try {
+      const dir = folderPath ? await this.resolveDir(folderPath) : this.dirHandle
+      if (!dir) return null
+      return await dir.getDirectoryHandle(name, { create: true })
+    } catch { return null }
+  }
+
+  async renameFile(filePath: string, oldName: string, newName: string): Promise<boolean> {
+    if (!this.dirHandle) return false
+    try {
+      const parentPath = filePath.split('/').slice(0, -1).join('/')
+      const parentDir = parentPath ? await this.resolveDir(parentPath) : this.dirHandle
+      if (!parentDir) return false
+      const handle = await parentDir.getFileHandle(oldName)
+      const content = await (await handle.getFile()).arrayBuffer()
+      const newHandle = await parentDir.getFileHandle(newName, { create: true })
+      const w = await newHandle.createWritable()
+      await w.write(content)
+      await w.close()
+      await parentDir.removeEntry(oldName)
+      return true
+    } catch { return false }
+  }
+
+  async renameFolder(folderPath: string, oldName: string, newName: string): Promise<boolean> {
+    if (!this.dirHandle) return false
+    try {
+      const parentPath = folderPath.split('/').slice(0, -1).join('/')
+      const parentDir = parentPath ? await this.resolveDir(parentPath) : this.dirHandle
+      if (!parentDir) return false
+      const oldDir = await parentDir.getDirectoryHandle(oldName)
+      const newDir = await parentDir.getDirectoryHandle(newName, { create: true })
+      await this.copyDir(oldDir, newDir)
+      await parentDir.removeEntry(oldName, { recursive: true })
+      return true
+    } catch { return false }
   }
 
   async listMarkdownFiles(

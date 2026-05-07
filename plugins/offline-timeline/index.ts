@@ -1,6 +1,6 @@
-import { get, set } from 'idb-keyval'
+import { get, set, del } from 'idb-keyval'
 import type { Plugin, App } from '../../src/plugin-api/index.ts'
-import { buildTimelinePanel } from './ui/timeline-panel.ts'
+import { buildTimelinePanel, type TimelinePanelCallbacks } from './ui/timeline-panel.ts'
 
 export interface Snapshot {
   id: string
@@ -44,80 +44,78 @@ let styleEl: HTMLStyleElement | null = null
 let unsubs: Array<() => void> = []
 
 const STYLES = `
-.timeline-panel {
-  width: 480px;
-  max-width: 90vw;
-  background: var(--bg-primary);
-  border-radius: 8px;
-  overflow: hidden;
+.timeline-list {
   display: flex;
   flex-direction: column;
-  max-height: 70vh;
-}
-.timeline-header {
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.timeline-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-.timeline-list {
-  overflow-y: auto;
-  flex: 1;
 }
 .timeline-empty {
-  padding: 32px 18px;
-  text-align: center;
-  font-size: 13px;
+  padding: 12px 16px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 .timeline-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  padding: 5px 12px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background .1s;
 }
-.timeline-row:last-child {
-  border-bottom: none;
+.timeline-row:hover {
+  background: var(--b3-theme-primary-lightest);
+  border-left-color: var(--accent);
+}
+.timeline-row-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
 }
 .timeline-meta {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 .timeline-time {
-  font-size: 11px;
-  color: var(--accent);
+  font-size: 12px;
+  color: var(--text-primary);
   font-weight: 500;
+  white-space: nowrap;
 }
 .timeline-preview {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.timeline-restore-btn {
-  flex-shrink: 0;
-  padding: 4px 10px;
-  font-size: 11px;
-  border-radius: 4px;
+.timeline-ctx-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-primary);
   border: 1px solid var(--border);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.18);
+  padding: 4px;
+  min-width: 190px;
+}
+.timeline-ctx-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  text-align: left;
   cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: inherit;
 }
-.timeline-restore-btn:hover {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
+.timeline-ctx-menu button:hover { background: var(--bg-secondary); }
 `
 
 const plugin: Plugin = {
@@ -134,44 +132,60 @@ const plugin: Plugin = {
     document.head.appendChild(styleEl)
 
     let currentFileId: string | null = null
+    let panelBody: HTMLElement | null = null
 
-    const openTimeline = async () => {
-      if (!currentFileId) {
-        alert('Open a file first to view its timeline.')
-        return
-      }
+    const refreshPanel = async () => {
+      if (!panelBody || !currentFileId) return
       const fileId = currentFileId
       const snapshots = await loadSnapshots(fileId)
 
-      let closePanel: (() => void) | null = null
-
-      const onRestore = async (snap: Snapshot) => {
-        const dateStr = new Date(snap.timestamp).toLocaleString()
-        if (!confirm(`Restore snapshot from ${dateStr}?\n\nThis will overwrite the current file content.`)) return
-        try {
-          await app.writeFile(fileId, snap.content)
-          closePanel?.()
-        } catch (err) {
-          console.error('[offline-timeline] Restore failed:', err)
-          alert('Restore failed. See console for details.')
-        }
+      const cbs: TimelinePanelCallbacks = {
+        onRestore: async (snap: Snapshot) => {
+          const dateStr = new Date(snap.timestamp).toLocaleString()
+          if (!confirm(`Restore snapshot from ${dateStr}?\n\nThis will overwrite the current file content.`)) return
+          try {
+            await app.writeFile(fileId, snap.content)
+            void refreshPanel()
+          } catch (err) {
+            console.error('[offline-timeline] Restore failed:', err)
+            alert('Restore failed. See console for details.')
+          }
+        },
+        onCompare: (contentA, labelA, contentB, labelB, onRestoreA) => {
+          app.openDiff(labelA, contentA, labelB, contentB, onRestoreA)
+        },
+        getCurrentContent: () => app.readFile(fileId),
       }
 
-      const content = buildTimelinePanel(fileId, snapshots, onRestore)
-      closePanel = app.openModal(content)
+      panelBody.innerHTML = ''
+      panelBody.appendChild(buildTimelinePanel(fileId, snapshots, cbs))
     }
 
-    app.addSidebarIcon(
-      `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
-      'Timeline',
-      () => {
-        void openTimeline()
-      },
+    unsubs.push(
+      app.addSidebarPanel('offline-timeline', 'Timeline', (body) => {
+        panelBody = body
+        void refreshPanel()
+      }),
     )
 
     unsubs.push(
       app.onFileOpen((file) => {
         currentFileId = file.path
+        void refreshPanel()
+      }),
+    )
+
+    unsubs.push(
+      app.onFileRename(async (oldPath, newPath) => {
+        const snapshots = await loadSnapshots(oldPath)
+        if (snapshots.length > 0) {
+          await set(KEY_PREFIX + newPath, snapshots.map(s => ({ ...s, fileId: newPath })))
+          await del(KEY_PREFIX + oldPath)
+        }
+        if (currentFileId === oldPath) {
+          currentFileId = newPath
+          void refreshPanel()
+        }
       }),
     )
 
@@ -188,6 +202,7 @@ const plugin: Plugin = {
             deviceId,
           }
           await saveSnapshot(file.path, snapshot)
+          void refreshPanel()
         } catch (err) {
           console.error('[offline-timeline] Failed to save snapshot:', err)
         }

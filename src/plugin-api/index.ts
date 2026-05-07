@@ -27,6 +27,8 @@ export type Permission =
 export interface App {
   registerPlugin(plugin: Plugin): void
   addView(id: string, factory: (container: HTMLElement) => View): void
+  addSidebarPanel(id: string, title: string, factory: (container: HTMLElement) => void): Unsubscribe
+  openDiff(nameA: string, contentA: string, nameB: string, contentB: string, onRestoreA?: () => void): void
   addCommand(cmd: Command): void
   addMenuItem(label: string, onClick: () => void): void
   addSidebarIcon(icon: string, title: string, onClick: () => void): void
@@ -43,6 +45,7 @@ export interface App {
   onFileOpen(cb: (file: VaultFile) => void): Unsubscribe
   onFileChange(cb: (file: VaultFile) => void): Unsubscribe
   onFileSave(cb: (file: VaultFile) => void): Unsubscribe
+  onFileRename(cb: (oldPath: string, newPath: string) => void): Unsubscribe
   onPreviewUpdate(cb: (container: HTMLElement) => void): Unsubscribe
   onOnline(cb: () => void): Unsubscribe
   onOffline(cb: () => void): Unsubscribe
