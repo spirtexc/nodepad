@@ -19,12 +19,9 @@ interface SidebarCallbacks {
 
 interface DragPayload { type: 'file' | 'folder'; path: string; name: string }
 
-// dataTransfer.getData() returns '' during dragover (browser security restriction).
-// Store the payload here on dragstart so dragover handlers can read it.
 let activeDrag: DragPayload | null = null
 
 function getDragData(e: DragEvent): DragPayload | null {
-  // During 'drop' we can read from dataTransfer; during 'dragover' use activeDrag.
   if (activeDrag) return activeDrag
   try {
     const raw = e.dataTransfer?.getData('text/plain')
@@ -32,6 +29,40 @@ function getDragData(e: DragEvent): DragPayload | null {
     const d = JSON.parse(raw) as DragPayload
     return d.type === 'file' || d.type === 'folder' ? d : null
   } catch { return null }
+}
+
+// ── Cached icon templates (parse SVG once, clone per use) ─────────────────────
+
+function makeIconEl(svgContent: string, w = 13): HTMLElement {
+  const span = document.createElement('span')
+  span.className = 'sidebar-item-icon'
+  span.innerHTML = svgContent.replace('WW', String(w))
+  return span
+}
+
+const FILE_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
+const FOLDER_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`
+const CHEVRON_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`
+
+let _fileIconTemplate: HTMLElement | null = null
+let _folderIconTemplate: HTMLElement | null = null
+let _chevronTemplate: HTMLElement | null = null
+
+function fileIcon(): HTMLElement {
+  if (!_fileIconTemplate) _fileIconTemplate = makeIconEl(FILE_SVG)
+  return _fileIconTemplate.cloneNode(true) as HTMLElement
+}
+function folderIcon(): HTMLElement {
+  if (!_folderIconTemplate) _folderIconTemplate = makeIconEl(FOLDER_SVG)
+  return _folderIconTemplate.cloneNode(true) as HTMLElement
+}
+function chevronEl(): HTMLElement {
+  if (!_chevronTemplate) {
+    _chevronTemplate = document.createElement('span')
+    _chevronTemplate.className = 'sidebar-folder-icon'
+    _chevronTemplate.innerHTML = CHEVRON_SVG
+  }
+  return _chevronTemplate.cloneNode(true) as HTMLElement
 }
 
 // ── Context menu ──────────────────────────────────────────────────────────────
@@ -81,6 +112,8 @@ function startInlineRename(
   onConfirm: (newName: string) => void,
 ): void {
   const input = document.createElement('input')
+  input.name = 'rename'
+  input.autocomplete = 'off'
   input.className = 'sidebar-rename-input'
   input.value = currentName
   labelEl.replaceWith(input)
@@ -116,12 +149,15 @@ export class Sidebar {
   private emptyMsg: HTMLElement
   private panelsEl: HTMLElement
   private items: Map<string, HTMLElement> = new Map()
+  private fileElMap: Map<string, HTMLElement> = new Map()  // path → file DOM element
   private searchInput: HTMLInputElement | null = null
   private treeNodes: TreeNode[] = []
   private treeClickHandler: ((file: VaultFile) => void) | null = null
   private activeFilePath: string | null = null
   private compareSource: VaultFile | null = null
   private callbacks: SidebarCallbacks
+  private expandedFolders: Set<string> = new Set()  // persists across re-renders
+  private searchDebounceTimer = 0
 
   constructor(container: HTMLElement, callbacks: SidebarCallbacks) {
     this.callbacks = callbacks
@@ -145,7 +181,7 @@ export class Sidebar {
       const data = getDragData(e)
       if (!data) return
       const currentParent = data.path.split('/').slice(0, -1).join('/')
-      if (currentParent === '') return  // already at root
+      if (currentParent === '') return
       if (!(e.target as HTMLElement).closest('.sidebar-folder-item')) {
         e.preventDefault()
         e.dataTransfer!.dropEffect = 'move'
@@ -192,9 +228,8 @@ export class Sidebar {
     const header = document.createElement('div')
     header.className = 'sidebar-panel-header'
 
-    const chevron = document.createElement('span')
+    const chevron = chevronEl()
     chevron.className = 'sidebar-panel-chevron open'
-    chevron.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`
 
     const titleEl = document.createElement('span')
     titleEl.className = 'sidebar-panel-title'
@@ -277,19 +312,24 @@ export class Sidebar {
 
     const input = document.createElement('input')
     input.type = 'search'
+    input.name = 'sidebar-search'
+    input.autocomplete = 'off'
     input.className = 'sidebar-search'
     input.placeholder = 'Search page or heading…'
     this.searchInput = input
 
     input.addEventListener('input', () => {
-      const q = input.value.toLowerCase().trim()
-      if (this.treeNodes.length > 0) {
-        this.applyTreeFilter(q)
-      } else {
-        this.items.forEach((el, name) => {
-          el.style.display = q === '' || name.toLowerCase().includes(q) ? '' : 'none'
-        })
-      }
+      clearTimeout(this.searchDebounceTimer)
+      this.searchDebounceTimer = window.setTimeout(() => {
+        const q = input.value.toLowerCase().trim()
+        if (this.treeNodes.length > 0) {
+          this.applyTreeFilter(q)
+        } else {
+          this.items.forEach((el, name) => {
+            el.style.display = q === '' || name.toLowerCase().includes(q) ? '' : 'none'
+          })
+        }
+      }, 120)
     })
 
     wrap.appendChild(input)
@@ -299,22 +339,24 @@ export class Sidebar {
   private applyTreeFilter(q: string): void {
     if (!this.treeClickHandler) return
     this.list.innerHTML = ''
+    this.fileElMap.clear()
     this.emptyMsg = document.createElement('div')
     this.emptyMsg.className = 'sidebar-empty'
     this.emptyMsg.textContent = 'No files match your search'
-    this.renderTree(this.treeNodes, this.list, 0, q)
-    if (!this.list.querySelector('.sidebar-item, .sidebar-folder-item')) {
-      this.list.appendChild(this.emptyMsg)
+    const frag = document.createDocumentFragment()
+    this.renderTree(this.treeNodes, frag, 0, q)
+    if (!frag.querySelector('.sidebar-item, .sidebar-folder-item')) {
+      frag.appendChild(this.emptyMsg)
     }
+    this.list.appendChild(frag)
     if (this.activeFilePath) {
-      const activeEl = this.list.querySelector(`[data-path="${CSS.escape(this.activeFilePath)}"]`)
-      activeEl?.classList.add('active')
+      this.fileElMap.get(this.activeFilePath)?.classList.add('active')
     }
   }
 
   // ── Tree rendering ─────────────────────────────────────────────────────────
 
-  private renderTree(nodes: TreeNode[], container: HTMLElement, depth: number, filter = ''): boolean {
+  private renderTree(nodes: TreeNode[], container: Node, depth: number, filter = ''): boolean {
     let hasVisible = false
     for (const node of nodes) {
       if (node.kind === 'file') {
@@ -326,9 +368,17 @@ export class Sidebar {
         hasVisible = true
       } else {
         const { folderEl, children, chevron } = this.buildFolderItem(node.folder, depth)
-        const childVisible = this.renderTree(node.folder.children, children, depth + 1, filter)
+        const childFrag = document.createDocumentFragment()
+        const childVisible = this.renderTree(node.folder.children, childFrag, depth + 1, filter)
         if (filter && !childVisible) continue
-        chevron.classList.add('open')
+        // During a filter: always expand. Otherwise: restore saved state.
+        const isExpanded = filter ? true : this.expandedFolders.has(node.folder.path)
+        if (isExpanded) {
+          chevron.classList.add('open')
+        } else {
+          children.classList.add('collapsed')
+        }
+        children.appendChild(childFrag)
         container.appendChild(folderEl)
         container.appendChild(children)
         hasVisible = true
@@ -346,20 +396,15 @@ export class Sidebar {
     folderEl.style.paddingLeft = `${8 + depth * 16}px`
     folderEl.draggable = true
 
-    const chevron = document.createElement('span')
-    chevron.className = 'sidebar-folder-icon'
-    chevron.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`
-
-    const folderIcon = document.createElement('span')
-    folderIcon.className = 'sidebar-item-icon'
-    folderIcon.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`
+    const chevron = chevronEl()
+    const fIcon = folderIcon()
 
     const label = document.createElement('span')
     label.className = 'sidebar-item-name'
     label.textContent = folder.name
 
     folderEl.appendChild(chevron)
-    folderEl.appendChild(folderIcon)
+    folderEl.appendChild(fIcon)
     folderEl.appendChild(label)
 
     const children = document.createElement('div')
@@ -369,6 +414,11 @@ export class Sidebar {
       if ((e.target as HTMLElement).closest('input')) return
       const collapsed = children.classList.toggle('collapsed')
       chevron.classList.toggle('open', !collapsed)
+      if (collapsed) {
+        this.expandedFolders.delete(folder.path)
+      } else {
+        this.expandedFolders.add(folder.path)
+      }
     })
 
     folderEl.addEventListener('contextmenu', (e) => {
@@ -401,7 +451,6 @@ export class Sidebar {
       ])
     })
 
-    // ── Drag source ──────────────────────────────────────────────────────────
     folderEl.addEventListener('dragstart', (e) => {
       e.stopPropagation()
       activeDrag = { type: 'folder', path: folder.path, name: folder.name }
@@ -414,13 +463,10 @@ export class Sidebar {
       folderEl.classList.remove('dragging')
     })
 
-    // ── Drop target (drop into this folder) ──────────────────────────────────
     folderEl.addEventListener('dragover', (e) => {
       const data = getDragData(e)
       if (!data) return
-      // Can't drop onto itself or a descendant
       if (data.type === 'folder' && (data.path === folder.path || folder.path.startsWith(data.path + '/'))) return
-      // No-op if already inside this folder
       const currentParent = data.path.split('/').slice(0, -1).join('/')
       if (currentParent === folder.path) return
       e.preventDefault()
@@ -451,16 +497,13 @@ export class Sidebar {
     item.dataset['path'] = file.path
     item.draggable = true
 
-    const icon = document.createElement('span')
-    icon.className = 'sidebar-item-icon'
-    icon.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
+    item.appendChild(fileIcon())
 
     const label = document.createElement('span')
     label.className = 'sidebar-item-name'
     label.textContent = file.name
     label.title = file.path
 
-    item.appendChild(icon)
     item.appendChild(label)
     item.addEventListener('click', () => this.treeClickHandler?.(file))
 
@@ -522,12 +565,13 @@ export class Sidebar {
       ])
     })
 
+    this.fileElMap.set(file.path, item)
     return item
   }
 
   private refreshCompareHighlight(): void {
-    this.list.querySelectorAll<HTMLElement>('.sidebar-item').forEach(el => {
-      el.classList.toggle('compare-source', el.dataset['path'] === this.compareSource?.path)
+    this.fileElMap.forEach((el, path) => {
+      el.classList.toggle('compare-source', path === this.compareSource?.path)
     })
   }
 
@@ -566,6 +610,7 @@ export class Sidebar {
     this.treeNodes = nodes
     this.treeClickHandler = onFileClick
     this.items.clear()
+    this.fileElMap.clear()
     if (this.searchInput) this.searchInput.value = ''
 
     this.list.innerHTML = ''
@@ -573,8 +618,10 @@ export class Sidebar {
     this.emptyMsg.className = 'sidebar-empty'
     this.emptyMsg.textContent = 'No markdown files found'
 
-    const hasFiles = this.renderTree(nodes, this.list, 0)
-    if (!hasFiles) this.list.appendChild(this.emptyMsg)
+    const frag = document.createDocumentFragment()
+    const hasFiles = this.renderTree(nodes, frag, 0)
+    if (!hasFiles) frag.appendChild(this.emptyMsg)
+    this.list.appendChild(frag)
   }
 
   showLoading(): void {
@@ -593,16 +640,13 @@ export class Sidebar {
     const item = document.createElement('div')
     item.className = 'sidebar-item'
 
-    const icon = document.createElement('span')
-    icon.className = 'sidebar-item-icon'
-    icon.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
+    item.appendChild(fileIcon())
 
     const label = document.createElement('span')
     label.className = 'sidebar-item-name'
     label.textContent = name
     label.title = name
 
-    item.appendChild(icon)
     item.appendChild(label)
     item.addEventListener('click', onClick)
     this.items.set(name, item)
@@ -614,10 +658,12 @@ export class Sidebar {
   }
 
   setActivePath(path: string): void {
+    // O(1): clear old, set new using the path→element map
+    if (this.activeFilePath) {
+      this.fileElMap.get(this.activeFilePath)?.classList.remove('active')
+    }
     this.activeFilePath = path
-    this.list.querySelectorAll<HTMLElement>('.sidebar-item').forEach(el => {
-      el.classList.toggle('active', el.dataset['path'] === path)
-    })
+    this.fileElMap.get(path)?.classList.add('active')
   }
 
   setTags(tags: string[], onTagClick: (tag: string) => void): void {
@@ -645,15 +691,24 @@ export class Sidebar {
     this.root.appendChild(section)
   }
 
+  focusSearch(): void {
+    if (this.searchInput) {
+      this.searchInput.focus()
+      this.searchInput.select()
+    }
+  }
+
   filterByPaths(paths: string[]): void {
-    this.list.querySelectorAll<HTMLElement>('.sidebar-item').forEach(el => {
-      el.style.display = paths.includes(el.dataset['path'] ?? '') ? '' : 'none'
+    const pathSet = new Set(paths)
+    this.fileElMap.forEach((el, path) => {
+      el.style.display = pathSet.has(path) ? '' : 'none'
     })
   }
 
   clear(): void {
     this.items.forEach(el => el.remove())
     this.items.clear()
+    this.fileElMap.clear()
     this.treeNodes = []
     this.treeClickHandler = null
     this.list.innerHTML = ''

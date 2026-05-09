@@ -8,12 +8,10 @@ Renders Mermaid diagrams inline in the editor. Raw code is hidden in reading mod
 
 Write a fenced code block tagged with `mermaid`:
 
-````
 ```mermaid
 graph TD
   A[Start] --> B{Decision}
 ```
-````
 
 - **Reading mode** — cursor outside the block → diagram is rendered, code is hidden
 - **Edit mode** — cursor inside the block → code is editable, live preview appears below

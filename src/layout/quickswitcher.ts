@@ -22,6 +22,8 @@ export class QuickSwitcher {
 
     const input = document.createElement('input')
     input.type = 'text'
+    input.name = 'quickswitcher'
+    input.autocomplete = 'off'
     input.className = 'qs-input'
     input.placeholder = 'Search files…'
     const resultList = document.createElement('div')

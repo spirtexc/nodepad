@@ -28,7 +28,7 @@ export class Vault {
 
   async openFolder(): Promise<FileSystemDirectoryHandle | null> {
     try {
-      const dir = await window.showDirectoryPicker()
+      const dir = await window.showDirectoryPicker({ mode: 'readwrite' })
       this.dirHandle = dir
       await set('handle:vault', dir)
       return dir

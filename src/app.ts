@@ -22,6 +22,8 @@ import mermaidPlugin from '../plugins/mermaid-diagrams/index.ts'
 import timelinePlugin from '../plugins/offline-timeline/index.ts'
 import mindmapPlugin from '../plugins/mindmap/index.ts'
 import graphViewPlugin from '../plugins/graph-view/index.ts'
+import spreadsheetPlugin from '../plugins/spreadsheet/index.ts'
+import markdownPlugin from '../plugins/markdown/index.ts'
 
 export class App {
   private editor!: Editor
@@ -41,7 +43,7 @@ export class App {
   private tagsIndex: TagsIndex
   private pluginLoader: PluginLoader
   private diskPlugins: Map<string, { plugin: Plugin; blobUrl: string; filename: string; enabled: boolean }> = new Map()
-  private builtinPlugins: Plugin[] = [mermaidPlugin, timelinePlugin, mindmapPlugin, graphViewPlugin]
+  private builtinPlugins: Plugin[] = [markdownPlugin, mermaidPlugin, timelinePlugin, mindmapPlugin, graphViewPlugin, spreadsheetPlugin]
   private pluginCleanups: Map<string, Array<() => void>> = new Map()
   private commands: Map<string, Command> = new Map()
   private views: Map<string, (container: HTMLElement) => View> = new Map()
@@ -97,7 +99,13 @@ export class App {
 
     const statusWrap = document.createElement('div')
     workspace.appendChild(statusWrap)
-    this.statusBar = new StatusBar(statusWrap)
+    // StatusBar needs the initial toggle state — read synchronously isn't possible,
+    // so we default to true and patch after the async read in initPlugins.
+    this.statusBar = new StatusBar(
+      statusWrap,
+      (enabled) => { void this.setAllPluginsEnabled(enabled) },
+      true,
+    )
 
     const debouncedAutoSave = debounce((..._args: unknown[]) => {
       this.saveActive()
@@ -201,6 +209,17 @@ export class App {
     searchBtn.className = 'dock-btn'
     searchBtn.title = 'Search'
     searchBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`
+
+    fileBtn.addEventListener('click', () => {
+      fileBtn.classList.add('active')
+      searchBtn.classList.remove('active')
+    })
+
+    searchBtn.addEventListener('click', () => {
+      searchBtn.classList.add('active')
+      fileBtn.classList.remove('active')
+      this.sidebar.focusSearch()
+    })
 
     dock.appendChild(fileBtn)
     dock.appendChild(searchBtn)
@@ -530,9 +549,39 @@ export class App {
   }
 
   private async initPlugins(): Promise<void> {
+    const globalOn = (await get<boolean>('plugins:global-enabled')) ?? true
+    this.statusBar.setPluginsEnabled(globalOn)
+    if (!globalOn) return
     for (const plugin of this.builtinPlugins) {
       const enabled = (await get<boolean>(`builtin-plugin:enabled:${plugin.id}`)) ?? true
       if (enabled) await this.loadPluginTracked(plugin)
+    }
+  }
+
+  private async setAllPluginsEnabled(enabled: boolean): Promise<void> {
+    await set('plugins:global-enabled', enabled)
+    if (enabled) {
+      // Reload every builtin that is individually enabled and not yet loaded
+      for (const plugin of this.builtinPlugins) {
+        const indiv = (await get<boolean>(`builtin-plugin:enabled:${plugin.id}`)) ?? true
+        if (indiv && !this.pluginLoader.isLoaded(plugin.id)) {
+          await this.loadPluginTracked(plugin)
+        }
+      }
+      // Reload vault plugins
+      for (const entry of this.diskPlugins.values()) {
+        if (entry.enabled && !this.pluginLoader.isLoaded(entry.plugin.id)) {
+          await this.loadPluginTracked(entry.plugin)
+        }
+      }
+    } else {
+      // Unload everything
+      for (const plugin of this.builtinPlugins) {
+        if (this.pluginLoader.isLoaded(plugin.id)) await this.unloadPlugin(plugin.id)
+      }
+      for (const entry of this.diskPlugins.values()) {
+        if (this.pluginLoader.isLoaded(entry.plugin.id)) await this.unloadPlugin(entry.plugin.id)
+      }
     }
   }
 
