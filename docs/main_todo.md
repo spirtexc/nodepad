@@ -7,7 +7,7 @@ Mirrors the Phase checklist in [[../CLAUDE.md|CLAUDE.md]], updated to reflect wh
 ### Phase 1 — Core editor
 - [x] Vite + TypeScript scaffold
 - [x] CodeMirror 6 with Markdown extensions
-- [x] File open/save via File System Access API (+ Electron `fs` fallback, see [[electron-desktop]])
+- [x] File open/save via File System Access API (+ Electron `fs` fallback, see [[architecture/electron]])
 - [x] Split pane editor + preview
 - [x] Auto-save on idle (debounced)
 - [x] Sidebar showing open files
@@ -21,15 +21,15 @@ Mirrors the Phase checklist in [[../CLAUDE.md|CLAUDE.md]], updated to reflect wh
 - [x] Quick switcher modal (Ctrl+P by name) — confirmed in README.md § Quick Start
 
 ### Phase 3 — Plugin API scaffold
-- [x] `Plugin` / `App` interfaces — see [[core-interfaces]]
+- [x] `Plugin` / `App` interfaces — see [[architecture/plugin-api]]
 - [x] Plugin loader with dynamic loading
 - [x] Permission checker (strips ungranted methods)
 - [x] Error isolation per plugin load/unload
-- [x] Plugin enable/disable toggle, persisted per-vault — see [[nodepad-folder]]
+- [x] Plugin enable/disable toggle, persisted per-vault — see [[architecture/storage]]
 - [ ] Plugin settings UI panel — basic enable/disable exists; no settings-fields UI yet
 
 ### Phase 4 — Plugins
-**Architectural deviation from CLAUDE.md:** plugins are no longer built into `src/` and shipped with the app. The app ships with **zero** built-in plugins. Plugins live as compiled `main.js` + `manifest.json` under a vault's `.nodepad/plugins/`, loaded at runtime. The `plugins/` folder at repo root holds TypeScript *source* for plugins the project maintains, compiled into `example/.nodepad/plugins/` for end users to copy. See [[plugin-cm-shims]] for the CodeMirror singleton requirement this introduces.
+**Architectural deviation from CLAUDE.md:** plugins are no longer built into `src/` and shipped with the app. The app ships with **zero** built-in plugins. Plugins live as compiled `main.js` + `manifest.json` under a vault's `.nodepad/plugins/`, loaded at runtime. The `plugins/` folder at repo root holds TypeScript *source* for plugins the project maintains, compiled into `example/.nodepad/plugins/` for end users to copy. See [[architecture/editor]] for the CodeMirror singleton requirement this introduces.
 
 - [x] 4a. Mermaid diagrams
 - [x] 4b. Offline timeline — snapshots write to `.nodepad/timeline/`, not IndexedDB
@@ -54,6 +54,6 @@ Mirrors the Phase checklist in [[../CLAUDE.md|CLAUDE.md]], updated to reflect wh
 
 ## Active backlog (not from CLAUDE.md)
 
-- [ ] **Codex plugin** — fully spec'd in `plugins/codex/PLAN.md`, not started. See [[codex-plugin]].
+- [ ] **Codex plugin** — fully spec'd in `plugins/codex/PLAN.md`, not started. See [[plugins/codex/codex]].
 - [ ] **Verify `clearAllTabs()`** (`src/app.ts`) — opening a new folder should clear the previous folder's tabs and restore the new folder's own `.nodepad/workspace.json`. Built and packaged, not yet manually tested in the running app.
 - [ ] One-time migration script for old IndexedDB timeline snapshots (orphaned after the move to `.nodepad/timeline/`) — discussed, not built. Low priority, no user has reported needing it.

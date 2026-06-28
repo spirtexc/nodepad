@@ -27,17 +27,17 @@ functionality with mindmaps, graph views, spreadsheets, sync, and more.
 | Layer         | Choice                 | Reason                                       |
 | ------------- | ---------------------- | -------------------------------------------- |
 | Language      | TypeScript             | Type safety, same as Obsidian                |
-| Build tool    | Vite                   | Fast HMR, simple config                      |
-| Editor        | CodeMirror 6           | Same engine as Obsidian, handles MD natively |
-| File I/O      | File System Access API | Browser-native, no backend needed            |
+| Build tool    | Vite                   | Fast HMR, simple config. **`base: './'` is required** — packaged Electron app loads via `file://`; absolute asset paths 404 without it |
+| Editor        | CodeMirror 6           | Same engine as Obsidian, handles MD natively. **Singleton instance** shared via `window.__nodepad_cm__` — plugins MUST NOT bundle their own copy (see [[docs/architecture/editor]]) |
+| File I/O      | File System Access API | Browser-native, no backend needed. Electron has a parallel path via `src/vault/electron-shim.ts` |
 | Search        | Fuse.js                | Lightweight fuzzy search                     |
 | Graph/mindmap | D3.js                  | Force graph + tree layouts                   |
 | Diagrams      | Mermaid.js             | Fenced code block rendering                  |
 | Spreadsheet   | Handsontable           | Inline table editing                         |
-| Local DB      | IndexedDB (via idb)    | Snapshot/timeline storage                    |
-| Desktop shell | Electron (Phase 5)     | Native file dialogs, system tray             |
+| Per-vault storage | Plain files under `.nodepad/` | Replaced IndexedDB/idb-keyval for anything that should travel with the vault (copyable, portable, survive reinstall). IndexedDB is used for **exactly one thing**: remembering the `FileSystemFileHandle` of the last-opened vault so the app can relaunch without a picker |
+| Desktop shell | Electron (Phase 5)     | NSIS installer; native dialogs via IPC       |
 | Mobile shell  | Capacitor (Phase 6)    | Same codebase in a WebView                   |
-| Cloud sync    | Supabase (plugin)      | Realtime WebSocket + storage                 |
+| Cloud sync    | Supabase (plugin)      | Realtime WebSocket + storage (Phase 4f, not started) |
 
 ---
 

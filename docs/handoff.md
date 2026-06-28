@@ -31,7 +31,7 @@ This is the single file to read first when picking up this project cold. It tell
 3. **Expected:** the `example/` tabs are gone, replaced by nothing (fresh folder, no `workspace.json` yet) or by that folder's own previously-saved tabs if it has a `.nodepad/workspace.json`.
 4. **Bug signature if this fails:** old tabs from `example/` still showing, or the editor pane showing stale content from the previous vault.
 
-If it's broken, the relevant code is `handleOpenFolder()` and `clearAllTabs()` in `src/app.ts` — read [[nodepad-folder]] for how `workspace.json` round-trips.
+If it's broken, the relevant code is `handleOpenFolder()` and `clearAllTabs()` in `src/app.ts` — read [[architecture/storage]] for how `workspace.json` round-trips.
 
 **Done when:** folder switching cleanly resets tabs and restores the new folder's own workspace state.
 
@@ -39,14 +39,14 @@ If it's broken, the relevant code is `handleOpenFolder()` and `clearAllTabs()` i
 
 ## Phase 2 — Codex plugin: inline `//` trigger
 
-Full spec: `plugins/codex/PLAN.md` (read it directly — it's outside this `docs/` vault). Digest: [[codex-plugin]].
+Full spec: `plugins/codex/PLAN.md` (read it directly — it's outside this `docs/` vault). Digest: [[plugins/codex/codex]].
 
-**Before writing any code:** [[plugin-cm-shims]] — this plugin uses `addEditorExtension`, so it must be compiled with the CodeMirror `--alias` flags or it will silently break at runtime with no compile-time warning.
+**Before writing any code:** [[architecture/editor]] — this plugin uses `addEditorExtension`, so it must be compiled with the CodeMirror `--alias` flags or it will silently break at runtime with no compile-time warning.
 
 Build order for this phase only:
 1. Detect `//` inline trigger, show the indicator widget (click or `Tab` to fire)
 2. Parse `(line X-Y)` context syntax, pull those lines from the active file
-3. Wire the custom-endpoint settings panel — credentials go in `.nodepad/codex.yaml`, AES-256-GCM encrypted (see [[codex-plugin]] for the exact key-storage flow)
+3. Wire the custom-endpoint settings panel — credentials go in `.nodepad/codex.yaml`, AES-256-GCM encrypted (see [[plugins/codex/codex]] for the exact key-storage flow)
 4. Streaming response, replaces `//prompt` in place when done
 5. `Escape` cancels
 
@@ -63,7 +63,7 @@ Build order for this phase only:
 
 ## Phase 3 — Codex plugin: chat sidebar
 
-Only start after Phase 2 is verified working. Spec: [[codex-plugin]] § Build order, item 2.
+Only start after Phase 2 is verified working. Spec: [[plugins/codex/codex]] § Build order, item 2.
 
 - Sidebar panel (`ui-panels` permission, `addSidebarPanel`)
 - Hybrid context: starts with current file, expands to vault-wide search if no answer found in current file alone
@@ -76,7 +76,7 @@ Only start after Phase 2 is verified working. Spec: [[codex-plugin]] § Build or
 
 ## Phase 4 — Codex plugin: ambient suggestions
 
-Spec: [[codex-plugin]] § Build order, item 3. Scoped deliberately to what's reliable in a browser-only app — **no AI call on file open**, just Fuse.js/backlink/timestamp checks already built into the app's existing indexes.
+Spec: [[plugins/codex/codex]] § Build order, item 3. Scoped deliberately to what's reliable in a browser-only app — **no AI call on file open**, just Fuse.js/backlink/timestamp checks already built into the app's existing indexes.
 
 **Done when:** opening or saving a note can surface "related notes," "not opened in 60+ days," or "missing wikilinks" hints, all computed offline with zero added latency.
 
@@ -84,7 +84,7 @@ Spec: [[codex-plugin]] § Build order, item 3. Scoped deliberately to what's rel
 
 ## Phase 5 — Codex plugin: structural organization
 
-Spec: [[codex-plugin]] § Build order, item 4. `//auto-tag`, `//find duplicates`, `//suggest links`, `//create index of this folder`, `//split this note`.
+Spec: [[plugins/codex/codex]] § Build order, item 4. `//auto-tag`, `//find duplicates`, `//suggest links`, `//create index of this folder`, `//split this note`.
 
 **Done when:** each of those five commands works end-to-end on a real note in the example vault.
 
