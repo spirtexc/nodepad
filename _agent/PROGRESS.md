@@ -31,4 +31,4 @@
 
 None — executed per approved mapping.
 
-**Next:** User to confirm scaffold looks correct, then proceed to Phase 1 (verify `clearAllTabs()`).
+**Next:** Answer Phase 2 open questions (5 items in PLAN.md § 2b/3b), then begin Codex inline trigger implementation.

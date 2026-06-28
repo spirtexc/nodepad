@@ -93,7 +93,7 @@ What content should be included in the prompt besides the `//` command?
 - The last heading section (from the nearest `#` above to the next `#`)
 - Smart: short note → whole note, long note → surrounding paragraph
 
-> **Your answer:**
+> **Answer (2026-06-28): d) Smart** — short note → whole note, long note → surrounding paragraph. Threshold: if note < 30 lines, suggest whole note; otherwise suggest the paragraph containing the cursor.
 
 ---
 
@@ -104,7 +104,7 @@ What content should be included in the prompt besides the `//` command?
 - No context — prompt only
 - Same as the auto-suggested range (whatever was shown in gray)
 
-> **Your answer:**
+> **Answer (2026-06-28): d) Same as the auto-suggested range** — bare `//` uses whatever the ghost suggestion showed. User can accept with `→` or type an explicit range.
 
 ---
 
@@ -316,7 +316,7 @@ Based on your answer to Q2, a few details need pinning down:
 - Just a blinking cursor-style symbol
 - A subtle pill button with text, e.g. `[ ↵ generate ]`
 
-> **Your answer:**
+> **Answer (2026-06-28): c) Subtle pill button** — `[ ↵ generate ]` shown as a CodeMirror decoration at the end of the line containing the `//` trigger. Disappears when generation starts.
 
 ---
 
@@ -334,7 +334,7 @@ More existing text
 - Yes — consecutive `//` lines are treated as one combined prompt
 - No — only the single line where the cursor sits is the prompt
 
-> **Your answer:**
+> **Answer (2026-06-28): a) Yes** — consecutive `//` lines combine into one prompt. The trigger indicator appears after the last consecutive `//` line. All `//` prefixes are stripped before sending to the AI.
 
 ---
 
@@ -360,7 +360,7 @@ If the prompt was on a single inline `//` and the AI returns 3 sentences:
 - Insert the output on new lines below the current line
 - Truncate to one line for inline triggers; use line-start `//` for multi-line output
 
-> **Your answer:**
+> **Answer (2026-06-28): b) Insert on new lines below** — multi-line output is inserted on new lines below the current line. The `//prompt` text is removed. This preserves readability of the surrounding text.
 
 ---
 
@@ -479,7 +479,7 @@ No API call on every file open — fast, free, fully offline.
 - A dedicated "Insights" panel in the sidebar
 - Notification toast in the status bar
 
-> **Your answer:**
+> **Answer (2026-06-28): c) Dedicated "Insights" panel** — a sidebar panel shows ambient suggestions (related notes, stale notes, missing wikilinks). User opens it when they want insights; no popups or inline clutter.
 
 ---
 

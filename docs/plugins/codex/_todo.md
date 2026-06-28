@@ -11,12 +11,13 @@
 - [ ] Streaming response, replaces `//prompt` in place when done
 - [ ] `Escape` cancels
 
-**Open questions (go back to user, don't assume):**
-- 3b-i: how the auto-suggested line range is calculated
-- 3b-2: what context is sent for a bare `//` with no range
-- 2b-i: exact visual style of the trigger indicator
-- 2b-ii: whether consecutive `//` lines combine into one prompt
-- 2b-iv: where multi-line output goes for an inline trigger
+**Open questions — ALL ANSWERED (2026-06-28):**
+- 3b-i: **d) Smart** — short note → whole note, long note → surrounding paragraph (< 30 lines threshold)
+- 3b-ii: **d) Same as auto-suggested range** — bare `//` uses the ghost suggestion
+- 2b-i: **c) Subtle pill button** — `[ ↵ generate ]` as CodeMirror decoration
+- 2b-ii: **a) Yes** — consecutive `//` lines combine into one prompt
+- 2b-iv: **b) Insert below** — multi-line output on new lines below current line
+- 13c (bonus): **c) Insights panel** — dedicated sidebar panel for ambient suggestions
 
 ## Phase 3 — Chat sidebar
 
