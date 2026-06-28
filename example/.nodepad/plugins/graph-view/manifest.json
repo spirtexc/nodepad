@@ -1,0 +1,9 @@
+{
+  "id": "graph-view",
+  "name": "Graph View",
+  "version": "1.0.0",
+  "permissions": [
+    "read-files",
+    "ui-panels"
+  ]
+}

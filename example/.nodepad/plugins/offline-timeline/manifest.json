@@ -1,0 +1,10 @@
+{
+  "id": "offline-timeline",
+  "name": "Offline Timeline",
+  "version": "1.0.0",
+  "permissions": [
+    "read-files",
+    "write-files",
+    "ui-panels"
+  ]
+}

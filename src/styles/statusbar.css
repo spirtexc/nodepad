@@ -1,0 +1,56 @@
+.statusbar {
+  height: 32px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background: var(--accent);
+  padding: 0 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, .9);
+  gap: 0;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.statusbar-item {
+  white-space: nowrap;
+  padding: 0 8px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid rgba(255,255,255,.15);
+  cursor: default;
+}
+
+.statusbar-item:first-child { padding-left: 0; }
+
+.statusbar-filename {
+  font-weight: 500;
+  color: #fff;
+}
+
+.statusbar-spacer { flex: 1; }
+
+.statusbar-plugins-toggle {
+  height: 100%;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  border-left: 1px solid rgba(255,255,255,.15);
+  color: rgba(255,255,255,.9);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  transition: background 0.15s;
+}
+
+.statusbar-plugins-toggle:hover {
+  background: rgba(255,255,255,.12);
+}
+
+.statusbar-plugins-toggle[data-enabled="false"] {
+  color: rgba(255,255,255,.45);
+  text-decoration: line-through;
+}

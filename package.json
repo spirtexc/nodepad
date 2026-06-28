@@ -1,0 +1,64 @@
+{
+  "name": "nodepad",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A privacy-first, local-first personal knowledge management app",
+  "author": "spirtexc",
+  "type": "module",
+  "main": "electron/dist/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "electron:dev": "npx tsx electron/dev.ts",
+    "electron:build": "npm run build && npx esbuild electron/main.ts --bundle --platform=node --format=esm --external:electron --outfile=electron/dist/main.js && npx esbuild electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=electron/dist/preload.js && npx electron-builder"
+  },
+  "dependencies": {
+    "@codemirror/basic-setup": "^0.20.0",
+    "@codemirror/lang-markdown": "^6.2.5",
+    "@codemirror/language-data": "^6.5.1",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/theme-one-dark": "^6.1.2",
+    "@codemirror/view": "^6.34.3",
+    "@rollup/rollup-linux-arm64-gnu": "^4.62.2",
+    "@types/d3": "^7.4.3",
+    "codemirror": "^6.0.1",
+    "d3": "^7.9.0",
+    "fuse.js": "^7.3.0",
+    "idb-keyval": "^6.2.1",
+    "marked": "^12.0.0",
+    "mermaid": "^11.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "chokidar": "^5.0.0",
+    "electron": "^42.2.0",
+    "electron-builder": "^26.8.1",
+    "tsx": "^4.22.3",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11"
+  },
+  "build": {
+    "appId": "com.nodepad.app",
+    "productName": "Nodepad",
+    "electronDist": "node_modules/electron/dist",
+    "directories": {
+      "output": "dist-desktop"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

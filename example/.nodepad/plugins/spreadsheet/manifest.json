@@ -1,0 +1,9 @@
+{
+  "id": "spreadsheet",
+  "name": "Spreadsheet",
+  "version": "1.0.0",
+  "permissions": [
+    "editor",
+    "ui-panels"
+  ]
+}

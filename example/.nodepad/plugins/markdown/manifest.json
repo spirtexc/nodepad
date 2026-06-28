@@ -1,0 +1,9 @@
+{
+  "id": "markdown",
+  "name": "Markdown Preview",
+  "version": "1.0.0",
+  "permissions": [
+    "editor",
+    "ui-panels"
+  ]
+}
