@@ -31,4 +31,26 @@
 
 None — executed per approved mapping.
 
-**Next:** Answer Phase 2 open questions (5 items in PLAN.md § 2b/3b), then begin Codex inline trigger implementation.
+## 2026-06-28 — Phase 2 Codex inline // trigger shipped
+
+- Implemented 5 changes in `plugins/codex/index.ts`:
+  1. Multi-line `//` combining — consecutive `//` lines merge into one prompt (Q4=a)
+  2. Smart range suggestion — <30 lines → whole note, ≥30 → paragraph (Q1=d)
+  3. Multi-line output inserted on new lines below trigger (Q5=b)
+  4. `detectTrighet` → `detectTrigger` rename + `lineStart/lineEnd` → `charStart/charEnd` rename
+  5. `TriggerWidget` constructor fix (separated from `toDOM`) + dead code removal
+- Debug log gated behind `localStorage.getItem('codex:debug')` — kept for future phases, not deleted
+- Verified: tsc clean, esbuild bundle 22.1kb, 3 logic test cases pass (combining/short-note/collision)
+- Commit: `5b2bd8a`
+
+**Checked boxes:**
+- [x] No CLAUDE.md invariant violated
+- [x] All 5 PLAN.md decisions implemented and verified
+- [x] Two-stage review passed (spec compliance + code quality)
+- [x] Cross-references correct, dead code removed
+
+**Deviations from plan:**
+- Two-stage review done manually (not via subagent) — `delegate_task` unavailable in terminal session
+- `charStart`/`charEnd` rename added after review caught the misnomer (cost a verification round)
+
+**Next:** Phase 3 — Codex chat sidebar. Read handoff.md Phase 3 spec, brainstorm scope with user (vault-aware context strategy, context budgeting), then plan.
