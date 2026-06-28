@@ -1,0 +1,11 @@
+{
+  "id": "codex",
+  "name": "Codex AI",
+  "version": "0.1.0",
+  "permissions": [
+    "editor",
+    "read-files",
+    "write-files",
+    "network"
+  ]
+}

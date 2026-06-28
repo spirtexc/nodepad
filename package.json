@@ -12,7 +12,15 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "electron:dev": "npx tsx electron/dev.ts",
-    "electron:build": "npm run build && npx esbuild electron/main.ts --bundle --platform=node --format=esm --external:electron --outfile=electron/dist/main.js && npx esbuild electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=electron/dist/preload.js && npx electron-builder"
+    "electron:build": "npm run build && npx esbuild electron/main.ts --bundle --platform=node --format=esm --external:electron --outfile=electron/dist/main.js && npx esbuild electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=electron/dist/preload.js && npx electron-builder",
+    "build:plugins": "npm run build:markdown && npm run build:mermaid && npm run build:spreadsheet && npm run build:mindmap && npm run build:graphview && npm run build:timeline && npm run build:codex",
+    "build:markdown": "npx esbuild plugins/markdown/index.ts --bundle --format=esm --alias:@codemirror/state=./plugins/_shims/codemirror-state.ts --alias:@codemirror/view=./plugins/_shims/codemirror-view.ts --alias:@codemirror/language=./plugins/_shims/codemirror-language.ts --outfile=example/.nodepad/plugins/markdown/main.js",
+    "build:mermaid": "npx esbuild plugins/mermaid-diagrams/index.ts --bundle --format=esm --alias:@codemirror/state=./plugins/_shims/codemirror-state.ts --alias:@codemirror/view=./plugins/_shims/codemirror-view.ts --alias:@codemirror/language=./plugins/_shims/codemirror-language.ts --outfile=example/.nodepad/plugins/mermaid-diagrams/main.js",
+    "build:spreadsheet": "npx esbuild plugins/spreadsheet/index.ts --bundle --format=esm --alias:@codemirror/state=./plugins/_shims/codemirror-state.ts --alias:@codemirror/view=./plugins/_shims/codemirror-view.ts --alias:@codemirror/language=./plugins/_shims/codemirror-language.ts --outfile=example/.nodepad/plugins/spreadsheet/main.js",
+    "build:mindmap": "npx esbuild plugins/mindmap/index.ts --bundle --format=esm --alias:@codemirror/state=./plugins/_shims/codemirror-state.ts --alias:@codemirror/view=./plugins/_shims/codemirror-view.ts --alias:@codemirror/language=./plugins/_shims/codemirror-language.ts --outfile=example/.nodepad/plugins/mindmap/main.js",
+    "build:graphview": "npx esbuild plugins/graph-view/index.ts --bundle --format=esm --alias:@codemirror/state=./plugins/_shims/codemirror-state.ts --alias:@codemirror/view=./plugins/_shims/codemirror-view.ts --alias:@codemirror/language=./plugins/_shims/codemirror-language.ts --outfile=example/.nodepad/plugins/graph-view/main.js",
+    "build:timeline": "npx esbuild plugins/offline-timeline/index.ts --bundle --format=esm --alias:@codemirror/state=./plugins/_shims/codemirror-state.ts --alias:@codemirror/view=./plugins/_shims/codemirror-view.ts --alias:@codemirror/language=./plugins/_shims/codemirror-language.ts --outfile=example/.nodepad/plugins/offline-timeline/main.js",
+    "build:codex": "npx esbuild plugins/codex/index.ts --bundle --format=esm --alias:@codemirror/state=./plugins/_shims/codemirror-state.ts --alias:@codemirror/view=./plugins/_shims/codemirror-view.ts --alias:@codemirror/language=./plugins/_shims/codemirror-language.ts --outfile=example/.nodepad/plugins/codex/main.js"
   },
   "dependencies": {
     "@codemirror/basic-setup": "^0.20.0",

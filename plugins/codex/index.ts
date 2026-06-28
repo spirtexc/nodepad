@@ -15,8 +15,8 @@ interface ActiveTrigger {
   from: number        // start of the `//` line content (after `// `)
   to: number          // end of the prompt text
   prompt: string      // text after `// `
-  lineStart: number   // doc position of line start
-  lineEnd: number     // doc position of line end
+  charStart: number   // doc position of trigger start
+  charEnd: number     // doc position of trigger end
   suggestionFrom?: number  // auto-suggested context range start
   suggestionTo?: number    // auto-suggested context range end
 }
@@ -132,21 +132,34 @@ function showStatus(msg: string, isError = false) {
 }
 
 // ─── Trigger detection ───────────────────────────────────────────────
-const TRIGGER_RE = /^\/\/|=\s*\/\/|^.*?=\s*\/\//  // = //, // at line start, or inline
 
-function detectTrighet(doc: { lineAt: (n: number) => { from: number; to: number; text: string } }, lineNumber: number): ActiveTrigger | null {
+function detectTrigger(doc: { lines: number; lineAt: (n: number) => { from: number; to: number; text: string } }, lineNumber: number): ActiveTrigger | null {
   const line = doc.lineAt(lineNumber)
   const text = line.text
 
   // Priority: line-start `//`
   const lineStartMatch = text.match(/^\/\/\s*(.*)/)
   if (lineStartMatch) {
+    // Check for consecutive `//` lines below (multi-line prompt)
+    let combinedPrompt = lineStartMatch[1] || ''
+    let lastLineNum = lineNumber
+    for (let next = lineNumber + 1; next <= doc.lines; next++) {
+      const nextLine = doc.lineAt(next)
+      const nextMatch = nextLine.text.match(/^\/\/\s*(.*)/)
+      if (nextMatch) {
+        combinedPrompt += '\n' + (nextMatch[1] || '')
+        lastLineNum = next
+      } else {
+        break
+      }
+    }
+    const lastLineEnd = doc.lineAt(lastLineNum).to
     return {
       from: line.from + 2,  // after //
-      to: line.to,
-      prompt: lineStartMatch[1] || '',
-      lineStart: line.from,
-      lineEnd: line.to,
+      to: lastLineEnd,
+      prompt: combinedPrompt,
+      charStart: line.from,
+      charEnd: lastLineEnd,
     }
   }
 
@@ -159,8 +172,8 @@ function detectTrighet(doc: { lineAt: (n: number) => { from: number; to: number;
       from: promptStart,
       to: promptStart + promptText.length,
       prompt: promptText,
-      lineStart: line.from,
-      lineEnd: line.to,
+      charStart: line.from,
+      charEnd: line.to,
     }
   }
 
@@ -169,7 +182,8 @@ function detectTrighet(doc: { lineAt: (n: number) => { from: number; to: number;
 
 // ─── Widget for trigger indicator ────────────────────────────────────
 class TriggerWidget extends WidgetType {
-  constructor(private prompt: string, private hasIndicator: boolean) { override toDOM() {
+  constructor(private prompt: string, private hasIndicator: boolean) {}
+  override toDOM() {
    const btn = document.createElement('span')
    btn.className = 'codex-trigger-indicator'
    btn.textContent = '↵ generate'
@@ -250,7 +264,7 @@ function updateTriggerDecorations(view: EditorView, prevTrigger: ActiveTrigger |
   let currentTrigger: ActiveTrigger | null = null
 
   for (let lineNum = 1; lineNum <= doc.lines; lineNum++) {
-    const trig = detectTrighet(doc, lineNum)
+    const trig = detectTrigger(doc, lineNum)
     if (!trig) continue
 
     // Add trigger indicator widget
@@ -260,15 +274,27 @@ function updateTriggerDecorations(view: EditorView, prevTrigger: ActiveTrigger |
     // Auto-suggest line range (ghost text) only if no explicit range in prompt
     const { cleanPrompt } = parseLineRange(trig.prompt)
     if (cleanPrompt && !trig.prompt.match(/\(line\s+\d+-\d+\)/i)) {
-      const para = getSurroundingParagraph(doc, lineNum)
-      if (para) {
-        const paraText = doc.sliceString(para.from, para.to).trim()
-        if (paraText.length > 0) {
-          trig.suggestionFrom = para.from
-          trig.suggestionTo = para.to
-          const firstLine = doc.lineAt(para.from)
-          const lastLine = doc.lineAt(para.to)
-          const lines = lastLine.number - firstLine.number + 1
+      // Smart range: short note → whole note, long note → surrounding paragraph
+      const SHORT_NOTE_THRESHOLD = 30
+      let suggestion: { from: number; to: number } | null = null
+
+      if (doc.lines < SHORT_NOTE_THRESHOLD) {
+        // Whole note
+        const firstLine = doc.lineAt(1)
+        const lastLine = doc.lineAt(doc.lines)
+        suggestion = { from: firstLine.from, to: lastLine.to }
+      } else {
+        // Surrounding paragraph of the first // line
+        suggestion = getSurroundingParagraph(doc, lineNum)
+      }
+
+      if (suggestion) {
+        const sugText = doc.sliceString(suggestion.from, suggestion.to).trim()
+        if (sugText.length > 0) {
+          trig.suggestionFrom = suggestion.from
+          trig.suggestionTo = suggestion.to
+          const firstLine = doc.lineAt(suggestion.from)
+          const lastLine = doc.lineAt(suggestion.to)
           const ghostDeco = Decoration.widget({ widget: new GhostWidget(`(line ${firstLine.number}-${lastLine.number})`), side: 1 })
           builder.add(trig.to, trig.to, ghostDeco)
         }
@@ -313,20 +339,27 @@ async function generate(trigger: ActiveTrigger): Promise<void> {
     contextBlock = `\n\n[Context from lines ${startLine.number}-${endLine.number}]\n${contextText}`
   } else if (trigger.suggestionFrom && trigger.suggestionTo) {
     const contextText = doc.sliceString(trigger.suggestionFrom, trigger.suggestionTo)
-    contextBlock = `\n\n[Context paragraph]\n${contextText}`
+    const startLine = doc.lineAt(trigger.suggestionFrom)
+    const endLine = doc.lineAt(trigger.suggestionTo)
+    contextBlock = `\n\n[Context from lines ${startLine.number}-${endLine.number}]\n${contextText}`
   }
 
   const fullPrompt = cleanPrompt + contextBlock
+
+  // DEBUG: gated behind localStorage.getItem('codex:debug') for logic verification
+  if (localStorage.getItem('codex:debug')) {
+    console.log('[Codex] Trigger payload:', {
+      prompt: cleanPrompt,
+      contextRange: rangeFrom !== undefined ? `${rangeFrom}-${rangeTo}` : (trigger.suggestionFrom ? `${trigger.suggestionFrom}-${trigger.suggestionTo}` : 'none'),
+      contextLabel: rangeFrom !== undefined ? 'explicit' : (trigger.suggestionFrom ? 'auto-suggested' : 'none'),
+      fullPromptLength: fullPrompt.length,
+    })
+  }
 
   // Set loading state
   triggerState.phase = 'generating'
   triggerState.ctrl = new AbortController()
   triggerState.errorMsg = null
-
-  // Dispatch loading loading
-  view.dispatch({
-    effects: triggerField.reconfigure ? undefined : undefined,
-  })
 
   try {
     const response = await fetch(config.endpointUrl, {
@@ -353,14 +386,18 @@ async function generate(trigger: ActiveTrigger): Promise<void> {
     const decoder = new TextDecoder()
     let accumulated = ''
 
-    // Build changes: remove the //prompt line and replace with result
-    const lineStart = doc.lineAt(trigger.lineStart)
-    const changes: { from: number; to: number; insert: string }[] = [
-      { from: trigger.lineStart, to: trigger.lineEnd, insert: '' },
-    ]
-    view.dispatch({ changes })
+    // Remove the //prompt line(s) first, then insert output below
+    const lineStartPos = doc.lineAt(trigger.charStart).from
+    const lineEndPos = doc.lineAt(trigger.charEnd).to
+    // Insert position: end of the line below the trigger
+    const insertAt = lineEndPos
+    // Delete the trigger line(s) and prepare to insert after the line below
+    view.dispatch({
+      changes: { from: lineStartPos, to: lineEndPos, insert: '' },
+    })
 
     let buffer = ''
+    let firstToken = true
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
@@ -383,9 +420,11 @@ async function generate(trigger: ActiveTrigger): Promise<void> {
             ?? ''
           if (token) {
             accumulated += token
-            // Stream insert
+            // Insert newline before first token (output goes below trigger line)
+            const insertText = firstToken ? '\n' + token : token
+            firstToken = false
             view.dispatch({
-              changes: { from: trigger.lineStart, insert: token },
+              changes: { from: insertAt, insert: insertText },
             })
           }
         } catch {
