@@ -36,6 +36,8 @@
 
 **(a) Fuse.js retrieval, one-pass (Q1=c, Q3 resolved):** Codex chat uses Fuse.js to retrieve top-K relevant files from the vault based on the user's question. One pass: retrieve → send → answer. Dropped the two-pass "detect uncertainty then re-ask" approach from handoff.md — fragile. Known v1 limitation: keyword retrieval, not semantic. Defer semantic/context expansion to future.
 
+> **Pattern note for (B):** Codex's Fuse.js search and graph-view's hand-rolled `[[wikilink]]` regex parsing are the SAME duplication — both re-implement a capability the core already maintains (VaultSearch, BacklinkIndex, TagsIndex). This is now two instances of one pattern: plugins reinventing core indexes because the plugin API doesn't expose them. One of (B)'s core jobs is to expose the existing core indexes through the plugin API so plugins stop copying them. (B) inherits this pattern, not just the search() instance.
+
 **(b) Context budgeting (Q2=b), mechanism pinned:** Top-K files (K=5) as primary control, plus `MAX_CONTEXT_TOKENS` (6000) as safety backstop. Algorithm: (1) always include current note full, (2) Fuse.js rank remaining files, (3) add in rank order until next file would exceed budget, (4) drop lowest-ranked — NEVER truncate mid-file as primary mechanism. (5) If current note alone exceeds budget: send current note only with `[...]` truncation marker, skip retrieved files.
 
 **(c) Plugin context stubbed (Q5=c):** Define the interface for Codex-to-plugin context requests, leave unimplemented. Ship chat-without-plugin-context as Phase 3. Cross-plugin wiring deferred.
