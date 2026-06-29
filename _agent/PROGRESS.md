@@ -61,3 +61,18 @@ None — executed per approved mapping.
 - nodepad_old/src confirmed intact (not lost).
 - Migration verified against sign-off `5b2bd8a`: `plugins/codex/index.ts` byte-identical. All five Phase 2 features present (multi-line, smart range <30, line-below output, charStart/charEnd, codex:debug). nodepad_old is stale pre-rebuild code, not a valid reference.
 - Root cause: earlier damage check compared against nodepad_old as ground truth and inverted the verdict. Corrected to use sign-off commit as sole reference (per SOUL.md: map wrong → fix, don't follow).
+
+## 2026-06-29 — Phase 3 Codex chat sidebar shipped
+
+- New files: `plugins/codex/{config,chat,retrieval,conversation-store,plugin-context}.ts`
+- `plugins/codex/index.ts`: sidebar panel `codex-chat` registered; crypto/config extracted to shared `config.ts`; version 0.1.0 → 0.2.0; added `ui-panels` permission
+- `src/plugin-api/index.ts` + `src/app.ts` + `src/plugin-api/loader.ts`: new `search(query, options?)` method exposing core VaultSearch to plugins (general primitive, granted under `read-files`). Return shape `{ path, name, score, excerpt? }` — path-only so consumers readFile() top-K on demand
+- Context budget: top-K (K=5) primary control + token cap (6000) backstop; current-note-exceeds-budget branch truncates current note + skips search; drop-lowest, never mid-file truncate
+- Conversations: `plugins/codex/conversation-store.ts` persists as `.md` in `.nodepad/codex/conversations/` (plugin-scoped, NOT first-class notes)
+- Plugin-context stub: returns null, no file sniffing (correction: killed the planned probe() back door)
+- Compatibility (A) closed: 6 missing MANIFESTs built, INDEX re-routed, two (B) prerequisites logged (keybinding arbitration, permission gating) + third (getLoadedPlugins())
+- Known limitation: char/4 token estimate (imprecise for code/CJK — same shelf as Fuse keyword-not-semantic)
+- Build verified: tsc clean, vite build 13.93s
+- Phase 2 untouched: `git diff 5b2bd8a -- plugins/codex/index.ts` empty
+
+**Next:** Phase 4 — ambient suggestions (Fuse.js/backlinks/timestamps, offline-only, gated insights panel).

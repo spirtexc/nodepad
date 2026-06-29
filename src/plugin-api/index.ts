@@ -1,6 +1,9 @@
 import type { EditorView } from '@codemirror/view'
 import type { Extension } from '@codemirror/state'
 import type { VaultFile } from '../vault/file-tree.ts'
+import type { SearchResult } from '../vault/search.ts'
+
+export type { SearchResult }
 
 export type Unsubscribe = () => void
 
@@ -38,6 +41,7 @@ export interface App {
   replaceSelection(text: string): void
   addEditorExtension(extension: Extension): Unsubscribe
   getActiveFile(): VaultFile | null
+  search(query: string, options?: { limit?: number }): SearchResult[]
   readFile(path: string): Promise<string>
   writeFile(path: string, content: string): Promise<void>
   readConfig(path: string): Promise<string>

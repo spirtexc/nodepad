@@ -109,3 +109,75 @@ the loader should enforce it.
 **Evidence:** `src/plugin-api/loader.ts:3-10` (PERMISSION_METHODS map — `ui-panels`
 only covers `addView`, `addSidebarIcon`; `addSidebarPanel` and `openModal`
 absent).
+
+---
+
+
+
+## 2026-06-29 — Phase 3 search(): general plugin-API extension, return shape pinned
+
+**Decision:** Expose the existing core `VaultSearch` to plugins via a new
+`search(query, options?)` method on the `App` interface. Backed by one-line
+delegation in `src/app.ts` (`this.vaultSearch.search(query)` + optional limit
+slice) — this is a DOOR to an existing capability, not new core surface.
+
+**Return shape (pinned now, not prose):** `SearchResult[]` where
+`SearchResult = { path: string, name: string, score: number, excerpt?:
+string }`. Re-exported from `src/plugin-api/index.ts` so plugins import the
+type. Chosen because:
+- `path` lets the consumer `readFile()` ONLY for files it actually uses — the
+  context budget retrieves paths first, reads top-K on demand
+- `excerpt` (already produced by VaultSearch.extractExcerpt) covers ghost
+  previews and lightweight ranking without wasted readFile on discarded results
+- NOT path+content (would read every hit upfront, breaking the budget model)
+- NOT snippets-only (loses full-file content for the AI)
+
+**Permission:** `read-files` (reads vault content for index + excerpts).
+
+**Why GENERAL, not a Codex hack:** motivated by Codex but shaped so graph-view
+and future plugins use it too — graph-view today re-parses wikilinks via regex
+instead of using BacklinkIndex because the core indexes aren't exposed. search()
+is the FIRST door in that pattern (see pattern note on the Phase 3 search() ADR).
+Another plugin would want it → satisfies the core-boundary test.
+
+**Context budget mechanism (pinned):** K files (default 5) is the PRIMARY
+control; `MAX_CONTEXT_TOKENS` (6000) is the safety backstop. Algorithm: (1)
+always include current note full, (2) if current note alone exceeds budget →
+send truncated current note with `[...]` marker, skip search, (3) otherwise
+search → top-K → readFile each in rank order → accumulate → drop the rest,
+NEVER truncate mid-file. `src/app.ts` adds `search()`, `src/plugin-api/index.ts`
+adds it to the interface + re-exports SearchResult, `loader.ts` grants it under
+`read-files`.
+
+**Evidence:** `src/plugin-api/index.ts` (interface + re-export), `src/app.ts`
+(one-line delegation), `src/plugin-api/loader.ts` (permission grant).
+
+---
+
+## 2026-06-29 — (B) Prerequisite: getLoadedPlugins() API for plugin-context
+
+**Context:** The Phase 3 plugin-context stub (`getPluginContext()`) needs to ask
+"are Mindmap / Graph View loaded?" to feed their structured context into Codex.
+There is no API to query the loaded-plugin registry. The stub returns null.
+
+**Decision:** LOGGED as (B) prerequisite. NOT built now. A `getLoadedPlugins()`
+returning `Plugin[]` (or `id[]`) on the App interface would let plugins discover
+peers without file sniffing. Alternative: an inter-plugin event bus. Both are
+platform-level features for (B), not Phase 3 work.
+
+**Evidence:** `plugins/codex/plugin-context.ts` (stub returns null, no probe).
+Backlog alongside keybinding arbitration + permission gating.
+
+---
+
+## 2026-06-29 — Known limitation: char/4 token estimate
+
+**Context:** The context budget's token counter uses `content.length / 4` (no
+tiktoken/WASM). Accepted as a v1 backstop to keep the browser bundle small.
+
+**Known imprecision:** off 2-3x for code-heavy or CJK content. The "current note
+exceeds budget" (truncate-skip-search) branch may misfire on long non-English
+notes. Same shelf as "Fuse keyword retrieval, not semantic" — revisit when
+context-quality feedback warrants a real tokenizer.
+
+**Evidence:** `plugins/codex/retrieval.ts:estimateTokens()`.

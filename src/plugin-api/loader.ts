@@ -2,7 +2,7 @@ import type { Plugin, App, Permission } from './index.ts'
 
 const PERMISSION_METHODS: Record<Permission, (keyof App)[]> = {
   'editor': ['getActiveEditor', 'replaceSelection', 'addEditorExtension'],
-  'read-files': ['readFile', 'listFiles', 'getBacklinks', 'readConfig'],
+  'read-files': ['readFile', 'listFiles', 'getBacklinks', 'readConfig', 'search'],
   'write-files': ['writeFile', 'writeConfig'],
   'ui-panels': ['addView', 'addSidebarIcon'],
   'commands': ['addCommand', 'addMenuItem'],

@@ -2,7 +2,7 @@
 
 Full spec with all design questions answered: `plugins/codex/PLAN.md` (plain path, not a wikilink — that file lives outside this `docs/` vault). Read that file directly before starting; this note is a digest, not a replacement.
 
-**Status: not started.**
+**Status: Phase 2 + Phase 3 shipped (inline // + chat sidebar). Phase 4–5 not started.**
 
 ## What it is
 
@@ -25,12 +25,12 @@ An inline AI assistant triggered by typing `//` in the editor — answers questi
 
 ## Build order (4 phases, from PLAN.md § 13)
 
-1. **Reactive inline `//` trigger** — build first
-2. **Chat sidebar** — vault-aware conversation, hybrid context (current file → expands to vault), saved as a `.md` note in the vault
+1. **Reactive inline `//` trigger** — shipped (commit `5b2bd8a`)
+2. **Chat sidebar** — shipped: vault-aware conversation via `app.search()` + context budget, persisted as `.md` in `.nodepad/codex/conversations/`
 3. **Ambient suggestions** — passive, triggered on file open/save only (not a true background process), scoped to what Fuse.js/backlinks/timestamps can do offline; no AI call on every file open
 4. **Structural organization** — `//auto-tag`, `//find duplicates`, `//suggest links`, `//create index`, `//split this note`
 
-Plugin context sources (alongside Phase 2): Mindmap (heading tree) and Graph View (wikilink map) feed structured context into Codex's prompts when those plugins are installed — Codex checks for them at runtime, no user config needed.
+Plugin context sources: Mindmap (heading tree) and Graph View (wikilink map) feed structured context into Codex's prompts — interface is STUBBED (returns null; needs getLoadedPlugins() API, a (B) prerequisite).
 
 ## Open questions in PLAN.md not yet answered
 

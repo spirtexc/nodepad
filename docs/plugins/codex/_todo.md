@@ -21,10 +21,12 @@
 
 ## Phase 3 — Chat sidebar
 
-- [ ] Sidebar panel (`ui-panels` permission, `addSidebarPanel`)
-- [ ] Hybrid context: starts with current file, expands to vault-wide search
-- [ ] Conversation saved as a `.md` note in the vault
-- [ ] Feed in Mindmap heading tree + Graph View wikilink map as extra context when those plugins are loaded
+- [x] Sidebar panel (`ui-panels` permission, `addSidebarPanel`)
+- [x] Hybrid context: starts with current file, expands to vault-wide search
+- [x] Fuse.js retrieval via core `app.search()` (one-pass; reuses VaultSearch)
+- [x] Context budget: top-K (K=5) primary + token cap (6000) backstop; drop-lowest, never mid-file truncate
+- [x] Conversation saved as `.md` in `.nodepad/codex/conversations/`
+- [x] Feed in Mindmap heading tree + Graph View wikilink map — interface STUBBED (returns null; needs getLoadedPlugins() API)
 
 ## Phase 4 — Ambient suggestions
 

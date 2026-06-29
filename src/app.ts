@@ -964,6 +964,10 @@ export class App {
         const handle = this.fileHandles.get(this.currentFilePath)
         return handle ? { name: this.currentFileName, path: this.currentFilePath, handle } : null
       },
+      search: (query: string, options?: { limit?: number }) => {
+        const results = this.vaultSearch.search(query)
+        return options?.limit ? results.slice(0, options.limit) : results
+      },
       listFiles: (folder?: string) => {
         const all = [...this.fileHandles.entries()].map(([path, handle]) => ({
           name: path.split('/').pop() ?? path,

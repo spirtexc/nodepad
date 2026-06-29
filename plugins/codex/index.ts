@@ -1,16 +1,12 @@
-import type { Plugin, App, Permission } from '../../src/plugin-api/index.ts'
+import type { App, Permission } from '../../src/plugin-api/index.ts'
 import { EditorView, WidgetType, ViewPlugin, Decoration, DecorationSet } from '../_shims/codemirror-view.ts'
 import { StateField, StateEffect } from '../_shims/codemirror-state.ts'
 import type { Extension } from '../_shims/codemirror-state.ts'
 import type { ViewUpdate } from '../_shims/codemirror-view.ts'
+import { loadConfig, saveConfig, type CodexConfig } from './config.ts'
+import { buildChatPanel } from './chat.ts'
 
 // ─── Types ───────────────────────────────────────────────────────────
-interface CodexConfig {
-  endpointUrl: string
-  apiKey: string
-  model: string
-}
-
 interface ActiveTrigger {
   from: number        // start of the `//` line content (after `// `)
   to: number          // end of the prompt text
@@ -33,58 +29,6 @@ let triggerState: {
   trigger: null,
   ctrl: null,
   errorMsg: null,
-}
-
-// ─── AES-256-GCM encryption ─────────────────────────────────────────
-async function getOrCreateKey(): Promise<CryptoKey> {
-  const { get, set } = await import('idb-keyval')
-  const existing = await get('codex:encryption-key')
-  if (existing) {
-    const raw = Uint8Array.from(atob(existing), c => c.charCodeAt(0))
-    return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt'])
-  }
-  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
-  const raw = await crypto.subtle.exportKey('raw', key)
-  await set('codex:encryption-key', btoa(String.fromCharCode(...(new Uint8Array(raw)))))
-  return key
-}
-
-async function encryptString(plaintext: string): Promise<string> {
-  const key = await getOrCreateKey()
-  const iv = crypto.getRandomValues(new Uint8Array(12))
-  const encoded = new TextEncoder().encode(plaintext)
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded)
-  const combined = new Uint8Array(iv.length + new Uint8Array(ciphertext).length)
-  combined.set(iv)
-  combined.set(new Uint8Array(ciphertext), iv.length)
-  return btoa(String.fromCharCode(...combined))
-}
-
-async function decryptString(b64: string): Promise<string> {
-  const key = await getOrCreateKey()
-  const combined = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
-  const iv = combined.slice(0, 12)
-  const ciphertext = combined.slice(12)
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext)
-  return new TextDecoder().decode(decrypted)
-}
-
-// ─── Config I/O ──────────────────────────────────────────────────────
-async function loadConfig(app: App): Promise<CodexConfig> {
-  const raw = await app.readConfig('codex/credentials.enc')
-  if (!raw) return { endpointUrl: '', apiKey: '', model: '' }
-  try {
-    const json = await decryptString(raw.trim())
-    return JSON.parse(json)
-  } catch {
-    return { endpointUrl: '', apiKey: '', model: '' }
-  }
-}
-
-async function saveConfig(app: App, config: CodexConfig): Promise<void> {
-  const json = JSON.stringify(config)
-  const encrypted = await encryptString(json)
-  await app.writeConfig('codex/credentials.enc', encrypted)
 }
 
 // ─── Line-range parsing ──────────────────────────────────────────────
@@ -548,12 +492,13 @@ function buildSettingsUI(container: HTMLElement, app: App) {
 function makeCodexPlugin(): Plugin {
   let removeExt: (() => void) | null = null
   let removePanel: (() => void) | null = null
+  let removeChatPanel: (() => void) | null = null
 
   return {
     id: 'codex',
     name: 'Codex AI',
-    version: '0.1.0',
-    permissions: ['editor', 'read-files', 'write-files', 'network'] as Permission[],
+    version: '0.2.0',
+    permissions: ['editor', 'read-files', 'write-files', 'network', 'ui-panels'] as Permission[],
 
     onLoad(app: App) {
       _app = app
@@ -565,6 +510,11 @@ function makeCodexPlugin(): Plugin {
       // Register sidebar panel for settings
       removePanel = app.addSidebarPanel('codex-settings', 'Codex Settings', (container) => {
         buildSettingsUI(container, app)
+      })
+
+      // Register sidebar panel for vault-aware chat (Phase 3)
+      removeChatPanel = app.addSidebarPanel('codex-chat', 'Codex Chat', (container) => {
+        buildChatPanel(container, app)
       })
 
       // Register the editor extension
@@ -582,8 +532,10 @@ function makeCodexPlugin(): Plugin {
     onUnload() {
       removeExt?.()
       removePanel?.()
+      removeChatPanel?.()
       removeExt = null
       removePanel = null
+      removeChatPanel = null
       _app = null
       triggerState.phase = 'idle'
       triggerState.trigger = null
