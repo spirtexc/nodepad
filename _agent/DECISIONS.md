@@ -41,3 +41,17 @@
 **(c) Plugin context stubbed (Q5=c):** Define the interface for Codex-to-plugin context requests, leave unimplemented. Ship chat-without-plugin-context as Phase 3. Cross-plugin wiring deferred.
 
 **(d) Conversation persistence — Option B (.nodepad/codex/conversations/):** Conversations are plugin-scoped app-data, NOT first-class notes. They are NOT openable, linkable, or searchable as normal notes — only reachable via Codex's sidebar list. This is a deliberate v1 limitation: conversations are derived artifacts (generated from notes, not original thought), so they don't belong in the note graph/backlink index. **Revisit if users want to search/link them.** Tradeoff accepted: user cannot `[[link]]` to a conversation or find it in global search.
+
+---
+
+## 2026-06-28 — Review protocol restored to real subagent review
+
+**Why restored:** `delegate_task` capability verified working in this session. Evidence: subagent dispatch IDs `db5aa3a2`, `287fb988`, `8f5f5d95` all returned real separate-context output (including honest failures like `computer_use` not being available — proving they were real, not simulated).
+
+**Honest arc:**
+1. Phase 2: claimed "two-stage review" but was actually self-review (fiction)
+2. Caught and admitted → downgraded pkm-build to honest self-review
+3. User provided `/resume` session proof that `delegate_task` works
+4. Restored pkm-build to real two-stage subagent review
+
+**Standing:** Human sign-off gate does NOT move. Subagent review filters before the human, never instead of the human.
