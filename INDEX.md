@@ -16,13 +16,13 @@ CLAUDE.md. Cross-cutting design: see docs/architecture/.
 ## Plugins (each links to its MANIFEST)
 | Plugin | What it does | Map |
 |---|---|---|
-| markdown | Markdown WYSIWYG rendering, code blocks, wikilink decorations | docs/plugins/markdown/MANIFEST.md |
-| codex | AI writing assistant (inline //, vault chat, ambient, structural) | docs/plugins/codex/MANIFEST.md |
-| graph-view | D3 graph of note links | docs/plugins/graph-view/MANIFEST.md |
-| mindmap | D3 mindmap | docs/plugins/mindmap/MANIFEST.md |
-| mermaid-diagrams | Mermaid rendering | docs/plugins/mermaid-diagrams/MANIFEST.md |
-| offline-timeline | IndexedDB snapshots (local-only) | docs/plugins/offline-timeline/MANIFEST.md |
-| spreadsheet | Tabular view | docs/plugins/spreadsheet/MANIFEST.md |
+| markdown | Markdown WYSIWYG rendering, code blocks, wikilink decorations | [[docs/plugins/markdown/MANIFEST]] |
+| codex | AI writing assistant (inline //, vault chat, ambient, structural) | [[docs/plugins/codex/MANIFEST]] |
+| graph-view | D3 force-directed graph of [[wikilinks]] | [[docs/plugins/graph-view/MANIFEST]] |
+| mindmap | D3 tree of note headings | [[docs/plugins/mindmap/MANIFEST]] |
+| mermaid-diagrams | Mermaid diagram rendering + edit mode | [[docs/plugins/mermaid-diagrams/MANIFEST]] |
+| offline-timeline | Save snapshots in sidebar panel (local-only) | [[docs/plugins/offline-timeline/MANIFEST]] |
+| spreadsheet | Interactive Markdown table editor | [[docs/plugins/spreadsheet/MANIFEST]] |
 
 ## Agent working memory
 docs/architecture/  ·  docs/plugins/<name>/  ·  _agent/ (TASKS, PROGRESS, DECISIONS, blockers)

@@ -55,3 +55,55 @@
 4. Restored pkm-build to real two-stage subagent review
 
 **Standing:** Human sign-off gate does NOT move. Subagent review filters before the human, never instead of the human.
+
+---
+
+## 2026-06-29 — (B) Open platform question: keybinding arbitration
+
+**Context:** Compatibility audit of all 7 plugins found one narrow conflict: codex's
+window-level `keydown` listener (Tab triggers generation when armed; Escape aborts
+when generating) vs spreadsheet's cell-input `keydown` listener (Tab navigates cells;
+Enter blurs). Spreadsheet's local handler calls `e.stopPropagation()`, so when a
+cell is focused, codex never receives the Tab — the user is stuck with codex armed
+but Tab navigating cells instead of generating.
+
+**The structural gap:** the platform has NO keybinding arbitration. Two plugins can
+both claim the same key and the winner is decided by DOM event order (capture vs
+bubble, stopPropagation). For our 7 trusted plugins this is a narrow edge case. For
+(B) — third-party plugins, richer interactions — it becomes a real problem: no
+central registry, no priority, no "this key is taken" feedback at load time.
+
+**Concrete conflict:** codex (Tab, armed phase) vs spreadsheet (Tab, focused cell).
+Escape is safe (spreadsheet doesn't listen for it).
+
+**Decision:** LOGGED as (B) prerequisite. NOT built now. When (B) is scoped, the
+system needs a keybinding registry: plugins declare desired keys at load, core
+resolves conflicts (first-registered-wins or explicit priority), and the editor
+compartment routes keys to the winning handler. Until then, plugin authors must
+manually avoid collisions — acceptable for 7 in-house plugins, unacceptable for
+third-party.
+
+**Evidence:** `plugins/codex/index.ts:468` (window keydown), `plugins/spreadsheet/index.ts:194` (input keydown + stopPropagation).
+
+---
+
+## 2026-06-29 — (B) Prerequisite: gate panel/modal APIs behind permissions
+
+**Context:** The permission map in `src/plugin-api/loader.ts` gates `addView` and
+`addSidebarIcon` behind `ui-panels`, but `addSidebarPanel` and `openModal` are NOT
+in any permission group — they're unrestricted. Any plugin can open a modal or
+register a sidebar panel without declaring it.
+
+**Why it matters for (B):** with third-party plugins, an undeclared modal could
+spoof UI, or a panel could claim a reserved slot. The current 7 plugins are trusted
+so this is harmless today. For (B) it's a real hole: plugins should declare
+`ui-panels` (or a finer-grained permission) to open modals or register panels, and
+the loader should enforce it.
+
+**Decision:** LOGGED as (B) prerequisite. NOT built now. When (B) is scoped, extend
+`PERMISSION_METHODS` to include `addSidebarPanel` and `openModal` under `ui-panels`
+(or a new `ui-modals` permission), and audit existing plugins to declare it.
+
+**Evidence:** `src/plugin-api/loader.ts:3-10` (PERMISSION_METHODS map — `ui-panels`
+only covers `addView`, `addSidebarIcon`; `addSidebarPanel` and `openModal`
+absent).
