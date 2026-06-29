@@ -1,6 +1,7 @@
+<!-- BACKUP COPY of the live skill at ~/.hermes/profiles/nodepad/skills/software-development/pkm-build/SKILL.md. The profile version is authoritative (Hermes loads from there). This repo copy is for version history + off-disk backup. After editing the live skill, copy it here verbatim (cp, not edit) and commit + push. Do NOT edit this copy and expect the live skill to follow. -->
 ---
 name: pkm-build
-original_description: >
+description: >
   Build workflow, map/routing protocol, filing rules, and self-verification for
   the Nodepad PKM app. Load before implementing, extending, or reviewing any
   feature or plugin, or before writing to docs/, _agent/, INDEX.md, or any
@@ -14,13 +15,6 @@ metadata:
 ---
 
 # Nodepad Build
-
-> **BACKUP COPY** of the live skill at
-> `~/.hermes/profiles/nodepad/skills/software-development/pkm-build/SKILL.md`.
-> The profile version is authoritative (Hermes loads from there). This repo copy
-> is for version history + off-disk backup. After editing the live skill, copy
-> it here again and commit + push — see the "Skill backup" note in the workflow
-> section below. Do NOT edit this copy and expect the live skill to follow.
 
 ## When to Use
 Load before writing or reviewing any code in this repo, adding/changing a
@@ -189,6 +183,13 @@ original feature is untouched. Report BOTH: "file differs at the file level
 8. Push to the remote: `git push`. The remote (`origin/main`) is the real
    backup; the local disk is just the working copy. A phase isn't truly done
    until it's pushed — a remote three phases stale isn't a real backup.
+8b. Skill backup: if you edited this skill (pkm-build SKILL.md), copy the live
+   version into the repo as a tracked backup:
+     cp ~/.hermes/profiles/nodepad/skills/software-development/pkm-build/SKILL.md \
+        docs/architecture/pkm-build-skill.md
+   then `git add` + commit + push. The profile version is authoritative; the
+   repo copy is for version history + off-disk safety. Without this step, the
+   skill that defines how you work is a single-disk asset.
 9. Hand off as a reviewable branch/diff, never a silent edit.
 
 ### Verification style (user preference — do not deviate)
