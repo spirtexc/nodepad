@@ -54,3 +54,10 @@ None — executed per approved mapping.
 - `charStart`/`charEnd` rename added after review caught the misnomer (cost a verification round)
 
 **Next:** Phase 3 — Codex chat sidebar. Read handoff.md Phase 3 spec, brainstorm scope with user (vault-aware context strategy, context budgeting), then plan.
+
+## 2026-06-29 — Recovery event (code intact, docs restored)
+
+- 6 docs deleted from working tree (unstaged): codex-plugin, core-interfaces, electron-desktop, nodepad-folder, plugin-cm-shims, tech-stack. Restored via `git restore` from HEAD.
+- nodepad_old/src confirmed intact (not lost).
+- Migration verified against sign-off `5b2bd8a`: `plugins/codex/index.ts` byte-identical. All five Phase 2 features present (multi-line, smart range <30, line-below output, charStart/charEnd, codex:debug). nodepad_old is stale pre-rebuild code, not a valid reference.
+- Root cause: earlier damage check compared against nodepad_old as ground truth and inverted the verdict. Corrected to use sign-off commit as sole reference (per SOUL.md: map wrong → fix, don't follow).
